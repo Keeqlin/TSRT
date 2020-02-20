@@ -20,9 +20,6 @@ if (MACOSX)
     set(BOOST_ROOT /usr/local/include/Cellar/boost)
 endif(MACOSX)
 
-# Find OpenCV, you may need to set OpenCV_DIR variable
-# to the absolute path to the directory containing OpenCVConfig.cmake file
-# via the command line or GUI
 find_package(OpenCV REQUIRED )
 find_package(Eigen3 REQUIRED )
 find_package(Boost REQUIRED COMPONENTS system)
