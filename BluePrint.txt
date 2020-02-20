@@ -1,0 +1,66 @@
+Configuration:
+	FPS:
+		Inpute video: 30, Chris-Net: ~20
+	TSR type:
+		tetragon, triangle, inverted triangle, hexagon, dash-lane
+	Average car velocity: 120 km/hr (33.33 m/s)
+
+Goal:
+	The overall TSR system should be operate over 30 FPS
+	Acquiring detection result of Chris-Net in 10Hz(Tracking 200ms)
+	Improving precision and recall by tracking algorithm
+
+
+
+
+
+Scenario:
+	Multiple object,
+		without occulsion between tragets(data association concern)
+	rigid-static tracking,
+	Monocular camera,
+	Non-stationary enviorment,
+		High way,
+		city(false positve elimination:prior of spatial distribution map),
+Charateristic:
+	Temporal correlation,
+	incermental framework for considering motion and apperane model simultaneously
+
+Difficulity:
+	backgroun, illumination, occlusion
+
+Advantages againts deep learning method:
+	expensive resources(costs, computation, hardware, dataset)
+	background change
+	object modeling (Solution: online adaptive learned detector)
+Disadvantages of deep learning method:
+	Poor generalizatoin ability ver unseen enviorments
+	can not capture the variation of the traget under non-stationary enviorment
+
+
+Motion FIltering: update and predict the tracking frames
+	measurement: detection result of offline-detector
+
+Incremental frame:
+	on-lime collector exames the credibility of predicted results by motion model
+		confident
+		not congident
+		Q: How to decide the confindeness of predicted result?
+			symmetry magnitude
+			appearance deviation
+			pixel distance between previous target
+
+
+
+
+
+
+RawData: nas::recordvepp.mp4
+TSR1: 0~2 sec
+TSR2: 7~10 sec
+TSR3: 26~30 sec
+TSR4 51~59 sec
+TSR5: 9.36~9.39
+
+
+

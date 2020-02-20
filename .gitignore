@@ -1,0 +1,4 @@
+# ignore all of the .mp4 file
+*.mp4
+# ignore all of files in build/
+/build/
