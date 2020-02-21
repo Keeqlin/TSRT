@@ -71,9 +71,8 @@ int main(int argc, char** argv){
 	cv::Mat stimulated_img = cv::Mat::zeros(cv::Size(cx*2,cy*2),CV_8UC3);
 
 
-
 	// Modeling
-	cv::Mat Sign = cv::imread(std::string(BTSD_sample_img_path+"F13.png").c_str(),cv::IMREAD_COLOR);
+	cv::Mat Sign = cv::imread("../F13.png",cv::IMREAD_COLOR);
 	cv::Mat scaled_Sign;
 	cv::resize(Sign,scaled_Sign,cv::Size(Sign.cols*4,Sign.rows*4));
 	std::cout<<"scaled_Sign.size(): "<<scaled_Sign.size()<<std::endl; //cm
