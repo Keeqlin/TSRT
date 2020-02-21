@@ -2,3 +2,5 @@
 *.mp4
 # ignore all of files in build/
 /build/
+/.vscode/
+
