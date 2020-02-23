@@ -219,7 +219,6 @@ void TEST_HOMO(const std::string& video_path){
 
         }
 
-
         cv::imshow("HOMO",Img);
         cv::waitKey(0);
         // cv::waitKey(FPS);
@@ -235,8 +234,7 @@ std::vector<cv::Point> arr2vec(cv::Point* arr, int num){
 }
 
 
-cv::Point2f operator*(cv::Mat M, const cv::Point2f& p)
-{ 
+cv::Point2f operator*(cv::Mat M, const cv::Point2f& p){ 
     cv::Mat_<double> src(3/*rows*/,1 /* cols */); 
 
     src(0,0)=p.x; 
@@ -250,8 +248,7 @@ cv::Point2f operator*(cv::Mat M, const cv::Point2f& p)
 
 
 
-cv::Mat Matrix3dtoCvMat(const Eigen::Matrix3d &m)
-{
+cv::Mat Matrix3dtoCvMat(const Eigen::Matrix3d &m){
     cv::Mat cvMat(3,3,CV_32F);
     for(int i=0;i<3;i++)
         for(int j=0; j<3; j++)
@@ -260,8 +257,7 @@ cv::Mat Matrix3dtoCvMat(const Eigen::Matrix3d &m)
 }
 
 
-Eigen::Matrix<double,3,3> toMatrix3d(const cv::Mat& cvMat3)
-{
+Eigen::Matrix<double,3,3> toMatrix3d(const cv::Mat& cvMat3){
     Eigen::Matrix<double,3,3> M;
     for(int i=0;i<3;i++)
         for(int j=0; j<3; j++)
@@ -271,7 +267,6 @@ Eigen::Matrix<double,3,3> toMatrix3d(const cv::Mat& cvMat3)
 
 
 Eigen::Vector3d Pixe2DtoPt3D(double pixel_x, double pixel_y, cv::Size img_size, double height, double depth){
-    
     pixel_x = pixel_x - img_size.width/2;
     pixel_y = pixel_y - img_size.height/2;
     // height -= img_size.height/(2*100);
@@ -358,10 +353,13 @@ double trajectory_tan(double heading_dis, cv::Point2d origin, double width, doub
         var_x = (tan_theta+tan_thetalim)*x_scale;
     }
 
+    double result;
+
     if(Turn_Dir == "R")
-        return origin.x + var_x;
+        result =  origin.x + var_x;
     if(Turn_Dir == "L")
-        return origin.x - var_x;
+        result = origin.x - var_x;
+    return result;
 }
 
 void MapToCamera(std::vector<Eigen::Vector3d> pts, const Camera_Motion& state,cv::Mat stimulated_img, const cv::Vec3b& color,const cv::Point& interval){

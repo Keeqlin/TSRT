@@ -60,12 +60,8 @@ public:
 
 inline std::ostream& operator<<(std::ostream& os, const TSR& rhs){
     os<<rhs.frame<<','<<rhs.type<<','<<rhs.bbox<<','<<rhs.pos;
-    // if(!rhs.sample_img.empty()){
-    //     cv::imshow("Sample Img", rhs.sample_img);
-    //     cv::waitKey(100);
-    // }
     return os;
-}/*-------------------IMUDATA-------------------*/
+}
 
 class BTSD_GT{
 	std::string seqName;
