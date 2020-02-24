@@ -293,27 +293,36 @@ void getAnglesformR(cv::Mat R, double &angleX, double &angleY, double &angleZ)
 }
 
 
+void pnp(std::vector<cv::Point3f>& Pt_3D, std::vector<cv::Point2f>& projected_pt, cv::Mat K){
+    cv::Mat Rvec;
+	cv::Mat_<float> Tvec;
+	cv::Mat raux, taux;
+	cv::Mat_<float> rotMat(3, 3);
+	cv::solvePnP( Pt_3D, projected_pt, K, cv::noArray(), raux, taux);
+	raux.convertTo(Rvec, CV_32F);    //旋转向量
+	taux.convertTo(Tvec, CV_32F);   //平移向量
+	cv::Rodrigues(Rvec, rotMat);  //由于solvePnP返回的是旋转向量，故用罗德里格斯变换变成旋转矩阵
+
+	//格式转换
+	auto R_n = toMatrix3d(rotMat);
+	Eigen::Vector3f T_n(Tvec.at<float>(0,0),Tvec.at<float>(0,1),Tvec.at<float>(0,2));
+	Eigen::Vector3f P_oc =  -R_n.inverse()*T_n;
+	std::cout<<"P_wc: ("<<P_oc.transpose()<<")m"<<std::endl;    
+}
 
 
 
 
+void Homography(std::vector<cv::Point2f>& ref_vertex,std::vector<cv::Point2f>& proj_vertex,  cv::Mat K){
+    std::vector<cv::Mat> r,t,n;
+	cv::Mat H = cv::findHomography(ref_vertex,proj_vertex);
+	cv::decomposeHomographyMat(H,K,r,t,n);
+    		
+	// // auto ratio_K = K.clone();
+	// // ratio_K.at<double>(1,1) *= y_factor;
+	// cv::decomposeHomographyMat(H,ratio_K,r,t,n);
 
-
-
-
-// void camera_pose_pnp(std::vector<cv::Point3f>& marker3d, std::vector<cv::Point2f>& mapped_marker2d, cv::Mat K){
-// 	cv::Mat Rvec;
-//     cv::Mat_<float> Tvec;
-//     cv::Mat raux, taux;
-//     cv::Mat_<float> rotMat(3, 3);
-// 	cv::solvePnP( marker3d, mapped_marker2d , K, cv::noArray(), raux, taux);
-// 	raux.convertTo(Rvec, CV_32F);    //旋转向量
-//     taux.convertTo(Tvec, CV_32F);   //平移向量
-//     cv::Rodrigues(Rvec, rotMat);  //由于solvePnP返回的是旋转向量，故用罗德里格斯变换变成旋转矩阵
-
-//     //格式转换
-//     auto R_n = toMatrix3d(rotMat);
-//     Eigen::Vector3d T_n(Tvec.at<float>(0,0),Tvec.at<float>(0,1),Tvec.at<float>(0,2));
-//     Eigen::Vector3d P_oc =  -R_n.inverse()*T_n;
-// 	std::cout<<"P_camera = "<<P_oc.transpose()<<std::endl;
-// }
+    // for(int i=0; i<r.size(); ++i){
+	// 	pose_recording(pose_stream[i],r.at(i),t.at(i));
+	// }
+}

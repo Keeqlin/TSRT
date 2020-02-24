@@ -86,7 +86,8 @@ double degTorad(double deg);
 double radTodeg(double rad);
 void pose_recording(std::fstream& os, cv::Mat& R, cv::Mat& T);
 void getAnglesformR(cv::Mat R, double &angleX, double &angleY, double &angleZ);
-
+void pnp(std::vector<cv::Point3f>& Pt_3D, std::vector<cv::Point2f>& projected_pt, cv::Mat K);
+void Homography(std::vector<cv::Point2f>& ref_vertex,std::vector<cv::Point2f>& proj_vertex, cv::Mat K);
 
 
 #endif 

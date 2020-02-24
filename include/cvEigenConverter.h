@@ -13,11 +13,11 @@ inline double distance(const Eigen::Matrix<T,3,1>& lhs,const Eigen::Matrix<T,3,1
 }
 
 
-inline Eigen::Matrix<double,3,3> toMatrix3d(const cv::Mat& cvMat3){
-    Eigen::Matrix<double,3,3> M;
+inline Eigen::Matrix<float,3,3> toMatrix3d(const cv::Mat& cvMat3){
+    Eigen::Matrix<float,3,3> M;
     for(int i=0;i<3;i++)
         for(int j=0; j<3; j++)
-            M(i,j) = cvMat3.at<double>(i,j);
+            M(i,j) = cvMat3.at<float>(i,j);
     return M;
 }
 

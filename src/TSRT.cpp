@@ -60,23 +60,18 @@ int main(int argc, char** argv){
 		pose_stream.push_back(std::move(os));
 	}
 
-	
 	// // SLAM 14 courses: pp.100 
 	// // camera configuration (first pirority)
 	double cx = 300; 
 	double cy = 250;
 	double fx = 518;
 	double fy = 518;
-
 	Eigen::Matrix3f Intrinsics = Eigen::Matrix3f::Zero(); //pixel
 	Intrinsics(0,0) = fx, 
 	Intrinsics(0,2) = cx; 
 	Intrinsics(1,1) = fy, 
 	Intrinsics(1,2) = cy; 
 	Intrinsics(2,2) = 1;
-
-	// cv::Size Img_size(cx * 2, cy * 2);
-	// cv::Mat stimulated_img = cv::Mat::zeros(cv::Size(cx * 2, cy * 2), CV_8UC3);
 
 	
 	// // Modeling
@@ -142,9 +137,16 @@ int main(int argc, char** argv){
 
 
 	//main loop
+	// pnp verification
+
 	auto ptr_TS_Rect = dynamic_cast<VISUALIZER::TS_Rect*>(vecObj_ptr.front());
 	ptr_TS_Rect->cal_rect_ref(viewer.getImg().size());
 	std::vector<cv::Point2f> ref_vertex(ptr_TS_Rect->rect_ref.ptArr.get(),ptr_TS_Rect->rect_ref.ptArr.get()+4);
+	std::vector<cv::Point3f> TS_3d;
+	for(int i =0; i<4; i++)
+		TS_3d.push_back(EigenVecTocvPt(ptr_TS_Rect->Conrner_3D[i]));
+	auto KK = EigenTocvMat(Intrinsics);
+	pnp(TS_3d,ref_vertex,KK);
 	for(auto& pose: camera_pose){
 		viewer.setPose(pose);
 
@@ -156,216 +158,113 @@ int main(int argc, char** argv){
 			cv::circle(cur_view, ptr_TS_Rect->rect_proj.ptArr.get()[i],2,GREEN,-1);
 
 		std::vector<cv::Point2f> proj_vertex(ptr_TS_Rect->rect_proj.ptArr.get(),ptr_TS_Rect->rect_proj.ptArr.get()+4);
-
-		std::vector<cv::Mat> r,t,n;
-		cv::Mat H = cv::findHomography(ref_vertex,proj_vertex);
-		cv::decomposeHomographyMat(H,EigenTocvMat(Intrinsics),r,t,n);
-		
-		
-		// // auto ratio_K = K.clone();
-		// // ratio_K.at<double>(1,1) *= y_factor;
-		// cv::decomposeHomographyMat(H,ratio_K,r,t,n);
-
-		for(int i=0; i<r.size(); ++i){
-			pose_recording(pose_stream[i],r.at(i),t.at(i));
-			std::cout<<"n("<<i<<")"<<n.at(i).t()<<std::endl;
-		}
-
+		pnp(TS_3d,proj_vertex,KK); //pnp verification
+		Homography(ref_vertex,proj_vertex,KK);
 
 		cv::imshow("TEST",cur_view);
 		cv::waitKey(1);
 	}
+
+
+
+	// set up a virtual camera
+  	float f = 100, w = 640, h = 480;
+
+  	cv::Mat1f K = (cv::Mat1f(3, 3) <<
+    	  f, 0, w/2,
+      	  0, f, h/2,
+          0, 0,   1);
+
+  	// set transformation from 1st to 2nd camera (assume K is unchanged)
+  	cv::Mat1f rvecDeg = (cv::Mat1f(3, 1) << 0, 0, 0);
+  	cv::Mat1f t = (cv::Mat1f(3, 1) << 10, 0, 66);
+
+  	std::cout << "-------------------------------------------\n";
+  	std::cout << "Ground truth:\n";
+
+  	std::cout << "K = \n" << K << std::endl << std::endl;
+  	std::cout << "rvec = \n" << rvecDeg << std::endl << std::endl;
+  	std::cout << "t = \n" << t << std::endl << std::endl;
+
+  	// set up points on a plane
+  	std::vector<cv::Point3f> p3d{{0, 0, 50},
+                               	{100, 0, 50},
+                               	{0, 100, 50},
+                               	{100, 100, 50}};
+
+  	// project on both cameras
+  	std::vector<cv::Point2f> Q, P, S;
+  	cv::Mat projec_img = cv::Mat::zeros(cv::Size(w,h),CV_8UC3);
+
+  	cv::Mat1f t1 = (cv::Mat1f(3, 1) << 10, 0, 0);
+  	cv::projectPoints(p3d,
+                      cv::Mat1d::zeros(3, 1),
+                      cv::Mat1d::zeros(3, 1),
+                      K,
+                      cv::Mat(),
+                      Q);
+    std::cout<<"projected Q:\n";
+   	for(auto& pt: Q){
+		std::cout<<pt<<" ";
+		cv::circle(projec_img, pt,2,GREEN,-1);
+   	}
+   	std::cout<<std::endl;
+
+  	cv::projectPoints(p3d,
+                    rvecDeg*CV_PI/180,
+                    t,
+                    K,
+                    cv::Mat(),
+                    P);
+
+	std::cout<<"projected P:\n";
+   	for(auto& pt: P){
+		std::cout<<pt<<" ";
+		cv::circle(projec_img, pt,2,RED,-1);
+   	}
+
+  	// find homography
+  	cv::Mat H = cv::findHomography(Q, P);
+  	std::cout << "-------------------------------------------\n";
+  	std::cout << "Estimated H = \n" << H << std::endl << std::endl;
+
+  	// check by reprojection
+  	std::vector<cv::Point2f> P_(P.size());
+  	cv::perspectiveTransform(Q, P_, H);
+  	float sumError = 0;
+  	for (size_t i = 0; i < P.size(); i++)
+    	sumError += cv::norm(P[i] - P_[i]);
+
+  	std::cout << "-------------------------------------------\n";
+  	std::cout << "Average reprojection error = "
+      	      << sumError/P.size() << std::endl << std::endl;
+
+  	// decompose using identity as internal parameters matrix
+  	std::vector<cv::Mat> Rs, Ts;
+  	cv::decomposeHomographyMat(H,
+                               K,
+                               Rs, Ts,
+                               cv::noArray());
+  	std::cout << "-------------------------------------------\n";
+  	std::cout << "Estimated decomposition:\n\n";
+  	std::cout << "rvec = " << std::endl;
+  	for (auto R_ : Rs) {
+    	cv::Mat1d rvec;
+    	cv::Rodrigues(R_, rvec);
+    	std::cout << rvec*180/CV_PI << std::endl << std::endl;
+  	}
+	std::cout << std::endl;
+
+  	std::cout << "t = " << std::endl;
+  	for (auto t_ : Ts) {
+    	std::cout << t_ << std::endl << std::endl;
+  	}
 	
-
-
-
-
-		
-
-			// for(auto& state:camera_pose){
-			// 	RECT rect;
-			// 	stimulated_img = cv::Mat::zeros(cv::Size(stimulated_img.cols,stimulated_img.rows),CV_8UC3);
-
-			// 	//project sign
-			// 	Eigen::Vector3d pcam1,pcam2,pcam3;
-			// 	for(int y = 0; y < Scaled_Sign.rows; y++)
-			// 		for(int x = 0; x < Scaled_Sign.cols; x++){
-			// 			Eigen::Vector3d pt_world = Pixe2DtoPt3D(x,y,Scaled_Sign.size(),TSR_height,TSR_depth);
-			// 			Eigen::Vector3d pt_camera = state.R.inverse()*(pt_world-state.T); //p_world to p_camera
-
-			// 			if(y==0 && x==0)
-			// 				pcam1 = pt_camera;
-			// 			if(y==scaled_Sign.rows-1 && x==scaled_Sign.cols-1)
-			// 				pcam2 = pt_camera;
-			// 			if(y==scaled_Sign.rows-1 && x==0)
-			// 				pcam3 = pt_camera;
-
-			// 			pt_camera /= pt_camera.z(); // normalized coordination: z = 1, in front of center of camera
-			// 			Eigen::Vector3d mapped_Pt = Intrinsics*(pt_camera);
-			// 			cv::Point cv_mapped_Pt(mapped_Pt.x() ,mapped_Pt.y());
-			// 			auto scaled_Intrinsics = Intrinsics;
-			// 			scaled_Intrinsics(1,1) *= y_factor;
-			// 			Eigen::Vector3d scaled_mapped_Pt = scaled_Intrinsics*(pt_camera);
-			// 			cv::Point scaled_cv_mapped_Pt(scaled_mapped_Pt.x() ,scaled_mapped_Pt.y());
-
-			// 			if(y==0 && x==0)
-			// 				rect.ptArr.get()[0] = scaled_cv_mapped_Pt;
-			// 			if(y==0 && x==scaled_Sign.cols-1)
-			// 				rect.ptArr.get()[1] = scaled_cv_mapped_Pt;
-			// 			if(y==scaled_Sign.rows-1 && x==scaled_Sign.cols-1)
-			// 				rect.ptArr.get()[2] = scaled_cv_mapped_Pt;
-			// 			if(y==scaled_Sign.rows-1 && x==0)
-			// 				rect.ptArr.get()[3] = scaled_cv_mapped_Pt;
-
-			// 			if(!out_of_Img(cv_mapped_Pt,stimulated_img.size()))
-			// 				stimulated_img.at<cv::Vec3b>(cv_mapped_Pt) = scaled_Sign.at<cv::Vec3b>(y,x);
-			// 	}
-			// 	rect.cal_center();
-			// 	mapped_Sign.push_back(rect);
-			// 	// auto v = pcam1 - pcam2;
-			// 	// auto u = pcam1 - pcam3;
-			// 	// auto nor_vec = v.cross(u);
-			// 	// std::cout<<"comput n: "<<nor_vec.transpose()/std::sqrt( std::pow(nor_vec.x(),2)+std::pow(nor_vec.y(),2)+std::pow(nor_vec.z(),2))<<std::endl;
-
-			// 	//Projecting
-			// 	MapToCamera(TSR_Bar, state, stimulated_img, cv::Vec3b(255,255,255));
-			// 	MapToCamera(Horizontal_line, state, stimulated_img, cv::Vec3b(0,255,0));
-			// 	for(auto& Lane: Lanes)
-			// 		MapToCamera(Lane, state, stimulated_img, cv::Vec3b(0,255,255));
-			// 	MapToCamera(mapPath, state, stimulated_img, cv::Vec3b(0,0,255),cv::Point(200,60));
-
-			// 	//Draw center of stimulated_img
-			// 	cv::circle(stimulated_img, cv::Point(stimulated_img.cols/2,stimulated_img.rows/2),3,RED,-1);
-
-			// 	std::vector<cv::Mat> r,t,n;
-			// 	Mat H = cv::findHomography(ref_scaled_Sign_pt,std::vector<cv::Point>(rect.ptArr.get(),rect.ptArr.get()+(rect.num_pt-1)));
-			// 	auto ratio_K = K.clone();
-			// 	ratio_K.at<double>(1,1) *= y_factor;
-			// 	cv::decomposeHomographyMat(H,K,r,t,n);
-			// 	// cv::decomposeHomographyMat(H,ratio_K,r,t,n);
-
-			// 	for(int i=0; i<r.size(); ++i){
-			// 		pose_recording(pose_stream[i],r.at(i),t.at(i));
-			// 		std::cout<<"n("<<i<<")"<<n.at(i).t()<<std::endl;
-			// 	}
-			// 	std::cout<<std::endl<<std::endl;
-
-			// 	cv::Mat reprojection = cv::Mat::zeros(cv::Size(stimulated_img.cols,stimulated_img.rows),CV_8UC3);
-			// 	warpPerspective(scaled_Sign, reprojection, H, reprojection.size());
-			// 	cv::imshow("Stimulated_img",stimulated_img);
-			// 	cv::imshow("reprojection",reprojection);
-			// 	// cv::waitKey(0);
-			// 	cv::waitKey(1);
-			// }
-
-			// 	// pnp verification
-			// 	std::vector<cv::Point3f> TSR_3d;
-			// 	for(auto& pt_2D:scaled_Sign_pt){
-			// 			auto pt3D = Pixe2DtoPt3D(pt_2D.x,pt_2D.y,scaled_Sign.size(),TSR_height,TSR_depth);
-			// 			TSR_3d.push_back(cv::Point3f(pt3D.x(),pt3D.y(),pt3D.z()));
-			// 			std::cout<<"TSR_3d: "<<TSR_3d.back()<<std::endl;
-			// 	}
-			// 	std::vector<cv::Point3f> m_marker3d;
-			// 	std::vector<cv::Point2f> ref_scaled_Sign_fpt;
-			// 	for(auto& pt:TSR_3d)
-			// 		m_marker3d.push_back(cv::Point3f(pt.x,pt.y,pt.z));
-			// 	for(auto& pt: ref_scaled_Sign_pt)
-			// 		ref_scaled_Sign_fpt.push_back(cv::Point2f(pt.x,pt.y));
-
-			// 	cv::Mat Rvec;
-			//     cv::Mat_<float> Tvec;
-			//     cv::Mat raux, taux;
-			//     cv::Mat_<float> rotMat(3, 3);
-			// 	cv::solvePnP( TSR_3d, ref_scaled_Sign_fpt , K, cv::noArray(), raux, taux);
-			// 	raux.convertTo(Rvec, CV_32F);    //旋转向量
-			//     taux.convertTo(Tvec, CV_32F);   //平移向量
-			//     cv::Rodrigues(Rvec, rotMat);  //由于solvePnP返回的是旋转向量，故用罗德里格斯变换变成旋转矩阵
-
-			//     //格式转换
-			//     auto R_n = toMatrix3d(rotMat);
-			//     Eigen::Vector3d T_n(Tvec.at<float>(0,0),Tvec.at<float>(0,1),Tvec.at<float>(0,2));
-			//     Eigen::Vector3d P_oc =  -R_n.inverse()*T_n;
-			// 	std::cout<<"P_oc = "<<P_oc.transpose()<<std::endl;
-
-			// // Test homography
-			// 	// set transformation from 1st to 2nd camera (assume Test_K is unchanged)
-			//   	cv::Mat1f rvecDeg = (cv::Mat1f(3, 1) << 0, 3, 0);
-			//   	cv::Mat1f t = (cv::Mat1f(3, 1) << 5, 5, -50);
-			//   	std::cout << "-------------------------------------------\n";
-			//   	std::cout << "Ground truth:\n";
-			//   	std::cout << "K = \n" << K << std::endl << std::endl;
-			//   	std::cout << "rvec = \n" << rvecDeg.t() << std::endl << std::endl;
-			//   	std::cout << "t = \n" << t.t() << std::endl << std::endl;
-
-			//   	// project on both cameras
-			//   	std::vector<cv::Point2f> Q, P, S;
-			//   	cv::Mat1f oriPose = (cv::Mat1f(3, 1) << 0, 3, -77);
-			//   	std::cout<<"oriPose: "<<oriPose<<std::endl;
-			//   	cv::projectPoints(TSR_3d,
-			//                       cv::Mat1f::zeros(3, 1),
-			// 					  oriPose,
-			//                       K,
-			//                       cv::Mat(),
-			//                       Q);
-			// 	std::cout<<"Projected pts(Q):"<<std::endl;
-			// 	for(auto& pt: Q)
-			// 		std::cout<<"\t"<<pt<<", ";
-			//   	std::cout<<std::endl;
-			//   std::cout<<"projected(w,h): "<<(Q[2]-Q[0])<<std::endl;
-
-			//   cv::projectPoints(TSR_3d,
-			//                     rvecDeg*CV_PI/180,
-			//                     t,
-			//                     K,
-			//                     cv::Mat(),
-			//                     P);
-			//   std::cout<<"Projected pts(P):"<<std::endl;
-			//   for(auto& pt: P)
-			// 	std::cout<<"\t"<<pt<<", ";
-			//   std::cout<<std::endl;
-
-			//   // find homography
-			//   cv::Mat H = cv::findHomography(Q, P);
-			//   std::cout << "-------------------------------------------\n";
-			//   std::cout << "Estimated H = \n" << H << std::endl << std::endl;
-
-			//   // check by reprojection
-			//   std::vector<cv::Point2f> P_(P.size());
-			//   cv::perspectiveTransform(Q, P_, H);
-			//   double sumError = 0;
-			//   for (size_t i = 0; i < P.size(); i++) {
-			//     sumError += cv::norm(P[i] - P_[i]);
-			//   }
-
-			//   std::cout << "-------------------------------------------\n";
-			//   std::cout << "Average reprojection error = "
-			//       << sumError/P.size() << std::endl << std::endl;
-
-			//   // decompose using identity as internal parameters matrix
-			//   std::vector<cv::Mat> Rs, Ts;
-			//   cv::decomposeHomographyMat(H,
-			//                              K,
-			//                              Rs, Ts,
-			//                              cv::noArray());
-
-			//   std::cout << "-------------------------------------------\n";
-			//   std::cout << "Estimated decomposition:\n\n";
-			//   std::cout << "rvec = " << std::endl;
-			//   for (auto R_ : Rs) {
-			//     cv::Mat1d rvec;
-			//     cv::Rodrigues(R_, rvec);
-			//     std::cout << rvec*180/CV_PI << std::endl << std::endl;
-			//   }
-
-			//   std::cout << std::endl;
-
-			//   std::cout << "t = " << std::endl;
-			//   for (auto t_ : Ts) {
-			//     std::cout << t_ << std::endl << std::endl;
-			//   }
-			// Homo Test end
-
-			return 0;
+	std::cout<<std::endl;
+   	cv::circle(projec_img,cv::Point(w/2,h/2),2,WHITE,-1);
+   	cv::imshow("2123",projec_img);
+   	cv::waitKey(0);
+	return 0;
 }
 
 std::vector<Mat> read_BTSD_Seq(const std::string& path, int index_start, const std::string& zero_num, const std::string& img_format, const std::string& prefix){
