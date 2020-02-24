@@ -1,7 +1,6 @@
 #include "utility.h"
 
 
-Eigen::Matrix3d Camera_Motion::K;
         
 std::vector<std::string> getline_and_prasingstr(std::fstream& fs, const std::string& delim){
     std::vector<std::string> vstr;
@@ -234,46 +233,10 @@ std::vector<cv::Point> arr2vec(cv::Point* arr, int num){
 }
 
 
-cv::Point2f operator*(cv::Mat M, const cv::Point2f& p){ 
-    cv::Mat_<double> src(3/*rows*/,1 /* cols */); 
-
-    src(0,0)=p.x; 
-    src(1,0)=p.y; 
-    src(2,0)=1.0; 
-
-    cv::Mat_<double> dst = M*src; //USE MATRIX ALGEBRA 
-    return cv::Point2f(dst(0,0),dst(1,0)); 
-} 
 
 
 
 
-cv::Mat Matrix3dtoCvMat(const Eigen::Matrix3d &m){
-    cv::Mat cvMat(3,3,CV_32F);
-    for(int i=0;i<3;i++)
-        for(int j=0; j<3; j++)
-            cvMat.at<float>(i,j)=m(i,j);
-    return cvMat.clone();
-}
-
-
-Eigen::Matrix<double,3,3> toMatrix3d(const cv::Mat& cvMat3){
-    Eigen::Matrix<double,3,3> M;
-    for(int i=0;i<3;i++)
-        for(int j=0; j<3; j++)
-            M(i,j) = cvMat3.at<double>(i,j);
-    return M;
-}
-
-
-Eigen::Vector3d Pixe2DtoPt3D(double pixel_x, double pixel_y, cv::Size img_size, double height, double depth){
-    pixel_x = pixel_x - img_size.width/2;
-    pixel_y = pixel_y - img_size.height/2;
-    // height -= img_size.height/(2*100);
-    pixel_x /= 100; //cm->m
-    pixel_y /= 100; //cm->m
-    return Eigen::Vector3d(pixel_x,pixel_y+height,depth); // m
-}
 
 double degTorad(double deg){
     if(deg<0)
@@ -285,24 +248,23 @@ double radTodeg(double rad){
     return rad/M_PI*180;
 }
 
-cv::Point pinhole_inv(int x, int y,cv::Size size){
-    return cv::Point(size.width-1-x,size.height-1-y);
-}
 
-bool out_of_Img(const cv::Point& pt, cv::Size size){
-    if(pt.y<size.height && pt.x<size.width && pt.x>=0 && pt.y>= 0)
-        return false;
-    return true;
-}
+
 
 
 void pose_recording(std::fstream& os, cv::Mat& R, cv::Mat& T){
-    double yaw,pitch,roll;
-    Eigen::Vector3d eigen_T(T.at<double>(0,0),T.at<double>(0,1),T.at<double>(0,2));
-    getAnglesformR(R, pitch, yaw, roll);
-
-    eigen_T = -toMatrix3d(R).inverse()*eigen_T;
-    getAnglesformR(R.inv(), pitch, yaw, roll);
+    // double yaw,pitch,roll;
+    Eigen::Vector3f eigen_T(T.at<float>(0,0),T.at<float>(0,1),T.at<float>(0,2));
+    // getAnglesformR(R, pitch, yaw, roll);
+    cv::Matx33f R33((float*)R.ptr());
+    eigen_T = -cvToEigenMat(R33).inverse()*eigen_T;
+    Eigen::Vector3f eulerAng = cvToEigenMat(R33).inverse().eulerAngles(2, 1, 0);
+    eulerAng = eulerAng / (CV_PI/180);
+    float roll, yaw, pitch;
+    roll = eulerAng.z();
+    yaw = eulerAng.y();
+    pitch = eulerAng.x();
+    // getAnglesformR(R.inv(), pitch, yaw, roll);
     os<<yaw<<","<<pitch<<","<<roll<<","
       <<eigen_T.x()<<","<<eigen_T.y()<<","<<eigen_T.z()<<std::endl;
 }
@@ -330,68 +292,11 @@ void getAnglesformR(cv::Mat R, double &angleX, double &angleY, double &angleZ)
 //     T(angleZ);
 }
 
-double trajectory_tan(double heading_dis, cv::Point2d origin, double width, double length, const std::string& Turn_Dir){
-    // for tan(x) = y
-    // y: +-6
-    // x: +-1.405647 rad
-    double tan_thetalim = 1.405647;
-    double tan_ylim = 6;
-    double y_scale = length/(2*tan_ylim);
-    double x_scale = width/(2*tan_thetalim);
-    cv::Point2d tan_origin(-tan_thetalim,-tan_ylim);
-    double var_x;
-    
-
-    if(origin.y > heading_dis){
-        var_x = 0;
-    }
-    else if((heading_dis-origin.y)>length){
-        var_x = width;
-    }else{
-        double scaled_y = (heading_dis-origin.y)/y_scale;
-        double tan_theta = atan(scaled_y-tan_ylim);
-        var_x = (tan_theta+tan_thetalim)*x_scale;
-    }
-
-    double result;
-
-    if(Turn_Dir == "R")
-        result =  origin.x + var_x;
-    if(Turn_Dir == "L")
-        result = origin.x - var_x;
-    return result;
-}
-
-void MapToCamera(std::vector<Eigen::Vector3d> pts, const Camera_Motion& state,cv::Mat stimulated_img, const cv::Vec3b& color,const cv::Point& interval){
-    Eigen::Vector3d vp(state.T(0),state.T(1),1000); // very far distance
-    Eigen::Vector3d vp_camera = state.R.inverse()*(vp-state.T); 
-    // Eigen::Vector3d vp_camera = state.R.inverse()*(vp)-state.T; 
-
-	vp_camera /= vp_camera.z();
-	Eigen::Vector3d mapped_vp = state.K*(vp_camera);
-    // cv::Point cv_mapped_vp(pinhole_inv(mapped_vp.x(),mapped_vp.y(),stimulated_img.size()));
-    cv::Point cv_mapped_vp(mapped_vp.x(),mapped_vp.y());
-
-    for(auto& pt_world:pts){
-        if( interval.x != 0 && pt_world.y() == 0 && (static_cast<int>(pt_world.z()*100)%interval.x > interval.y))
-            continue;
-        Eigen::Vector3d pt_camera = state.R.inverse()*(pt_world-state.T); 
-		pt_camera /= pt_camera.z();
-		Eigen::Vector3d mapped_Pt = state.K*(pt_camera);
-        cv::Point cv_mapped_Pt(mapped_Pt.x(),mapped_Pt.y());
-        //check the vanish point for ground object
-        bool vp_flag = ((pt_world.y() == 0) && (cv_mapped_vp.y>cv_mapped_Pt.y)) ?true:false;
-		if(!out_of_Img(cv_mapped_Pt,stimulated_img.size() ) && !vp_flag)
-		    stimulated_img.at<cv::Vec3b>(cv_mapped_Pt) = color;
-	}
-}
 
 
 
-double dis_Vector3d(const Eigen::Vector3d& lhs,const Eigen::Vector3d& rhs){
-    double res = std::pow(std::abs(rhs.x()-lhs.x()),2) + std::pow(std::abs(rhs.y()-lhs.y()),2) + std::pow(std::abs(rhs.z()-lhs.z()),2);
-    return std::sqrt(res);
-}
+
+
 
 
 

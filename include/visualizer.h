@@ -2,6 +2,9 @@
 #define VISULIZER_H
 
 #include "cvEigenConverter.h"
+
+#include "Shape.h"
+#include <functional>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -24,7 +27,6 @@ namespace VISUALIZER{
 //  right-hand coordinate systm (unit: m)
 //  (+x,+y,+z): right, down, front
 //  (x-axis, y-axis, z-axis): pitch, yaw, roll 
-
 inline cv::Point2f pixelToCam(const cv::Point& pixel, const cv::Size& size){
     cv::Point2f fpt(pixel.x, pixel.y);
     fpt.x -= static_cast<float>(size.width-1)/2;
@@ -43,7 +45,7 @@ public:
 inline std::ostream &operator<<(std::ostream &os, const GBRxyzPt &rhs){
     os << "xyz"<< rhs.xyz<<", GBR"<< rhs.GBR;
     return os;
-} /*-------------------IMUDATA-------------------*/
+}
 
 class Pose{
 public:
@@ -74,6 +76,11 @@ public:
     Eigen::Vector3f tcw;
 };
 
+// inline std::ostream &operator<<(std::ostream &os, const pose &rhs){
+//     os << "tw xyz"<< rhs.xyz<<", GBR"<< rhs.GBR;
+//     return os;
+// }
+
 class Camera_Viewer{
 public:
     explicit Camera_Viewer(Eigen::Matrix3f& _K):K(_K){
@@ -82,11 +89,12 @@ public:
     explicit Camera_Viewer(Eigen::Matrix3f& _K, const Pose& _pose):K(_K), pose(_pose){
         projected_Img = cv::Mat::zeros(cv::Size(K(0,2)*2,K(1,2)*2),CV_8UC3);
     }
+    void setPose(const Pose& _pose);
+    cv::Point2f projection(const Eigen::Vector3f& pt_world);
     void projectToImg(const std::vector<GBRxyzPt>& pointcloud);
     cv::Mat getImg() const;
  protected:
     bool out_of_Img(int col, int row) const;
-    cv::Point2f projection(const Eigen::Vector3f& pt_world);
  private:
      Pose pose;           // world coordinate system
      Eigen::Matrix3f K;   // Intrinsics matrix
@@ -105,7 +113,8 @@ class Obj{
 public:
     Obj(){}
     Obj(const Pose& _pose):pose(_pose){}
-    std::vector<GBRxyzPt>& get() { return pointcloud;}
+    std::vector<GBRxyzPt>& get() {return pointcloud;}
+    virtual ~Obj(){pointcloud.clear();}
 protected :
     void PposeToPw();
     std::vector<GBRxyzPt> pointcloud;
@@ -113,14 +122,21 @@ protected :
     std::string Name;
 };
 
-class TSR_Obj: public Obj{
+class TS_Rect: public Obj{
 public:
-    explicit TSR_Obj(cv::Mat TSR_img, double TSR_height_pose, double TSR_depth_pose, const Pose &TSR_pose = Pose());
+    explicit TS_Rect(cv::Mat _TS_img, double TS_height_pose, double TS_depth_pose, const Pose &TS_pose = Pose());
+    void cal_rect_ref(const cv::Size& Mapping_size);
+    void cal_rect_proj(std::function<cv::Point2f(const Eigen::Vector3f&)> projection);
+    Eigen::Vector3f Conrner_3D[4]; //
+    SHAPE::RECT rect_ref;
+    SHAPE::RECT rect_proj;
+    cv::Mat TS_img;
 };
 
-class LANE_Obj : public Obj{
+class LANE : public Obj{
 public:
-    explicit LANE_Obj(double LANE_len, const cv::Vec3b &color, const cv::Point &dash_para = cv::Point(), const Pose &LANE_pose = Pose());
+   explicit LANE(double LANE_len, const cv::Vec3b &color, const cv::Point &dash_para = cv::Point(), const Pose &LANE_pose = Pose());
+   explicit LANE(const std::vector<GBRxyzPt>& pts, const cv::Point &dash_para = cv::Point(), const Pose &LANE_pose = Pose());
 };
 
 }  // namespace VISUALIZER

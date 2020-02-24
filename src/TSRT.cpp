@@ -52,13 +52,13 @@ int main(int argc, char** argv){
 
 
 
-	// // use for recording pose estimation of decomposedH
-	// std::vector<std::fstream> pose_stream;
-	// for(int i=0; i<4; i++){
-	// 	std::string name = "decompose_H_pose";
-	// 	std::fstream os(std::string(name+std::to_string(i)+".txt").c_str(), std::ios::out | std::ios::trunc);
-	// 	pose_stream.push_back(std::move(os));
-	// }
+	// use for recording pose estimation of decomposedH
+	std::vector<std::fstream> pose_stream;
+	for(int i=0; i<4; i++){
+		std::string name = "decompose_H_pose";
+		std::fstream os(std::string(name+std::to_string(i)+".txt").c_str(), std::ios::out | std::ios::trunc);
+		pose_stream.push_back(std::move(os));
+	}
 
 	
 	// // SLAM 14 courses: pp.100 
@@ -75,124 +75,112 @@ int main(int argc, char** argv){
 	Intrinsics(1,2) = cy; 
 	Intrinsics(2,2) = 1;
 
-	cv::Size Img_size(cx * 2, cy * 2);
-	cv::Mat stimulated_img = cv::Mat::zeros(cv::Size(cx * 2, cy * 2), CV_8UC3);
+	// cv::Size Img_size(cx * 2, cy * 2);
+	// cv::Mat stimulated_img = cv::Mat::zeros(cv::Size(cx * 2, cy * 2), CV_8UC3);
 
 	
 	// // Modeling
 	cv::Mat Sign = cv::imread("../F13.png", cv::IMREAD_COLOR);
-	cv::Mat scaled_Sign;
-	cv::resize(Sign, scaled_Sign, cv::Size(Sign.cols * 4, Sign.rows * 4));
-	std::cout << "scaled_Sign.size(): " << scaled_Sign.size() << std::endl; //cm
-	std::vector<cv::Point> ref_scaled_Sign_pt, scaled_Sign_pt;
-	double ratio = (Img_size.width > Img_size.height) ? static_cast<double>(Img_size.height) / static_cast<double>(scaled_Sign.rows) : static_cast<double>(Img_size.width) / static_cast<double>(scaled_Sign.cols);
-	std::cout << "ratio: " << ratio << std::endl;
-	cv::Point Img_center = cv::Point(cx, cy);
-	cv::Point scaled_Sign_center = cv::Point(scaled_Sign.cols / 2, scaled_Sign.rows / 2);
-	scaled_Sign_pt.push_back(cv::Point(0, 0));
-	scaled_Sign_pt.push_back(cv::Point(scaled_Sign.cols - 1, 0));
-	scaled_Sign_pt.push_back(cv::Point(scaled_Sign.cols - 1, scaled_Sign.rows - 1));
-	scaled_Sign_pt.push_back(cv::Point(0, scaled_Sign.rows - 1));
-	for (auto pt : scaled_Sign_pt){
-		ref_scaled_Sign_pt.push_back(Img_center + ratio * (pt - scaled_Sign_center));
-	}
-
-	// // double fix_length = scaled_Sign.cols;
-	// // ref_scaled_Sign_pt.push_back(cv::Point(0,0));
-	// // ref_scaled_Sign_pt.push_back(cv::Point(fix_length-1,0));
-	// // ref_scaled_Sign_pt.push_back(cv::Point(fix_length-1,fix_length-1));
-	// // ref_scaled_Sign_pt.push_back(cv::Point(0,fix_length-1));
-	// cv::Point center(0,0);
-	// for(auto& pt: ref_scaled_Sign_pt)
-	// 	center+=pt;
-	// center/=4;
-	// // ref_scaled_Sign_pt.push_back(center);
-	// double y_factor = 1;
-	// // y_factor = static_cast<double>(scaled_Sign.cols)/static_cast<double>(scaled_Sign.rows);
+	cv::Mat Scaled_Sign;
+	cv::resize(Sign, Scaled_Sign, cv::Size(Sign.cols * 4, Sign.rows * 4)); //1 pixel = 1 cm 
+	std::cout << "Scaled_Sign.size(): " << Scaled_Sign.size() <<" cmxcm"<<std::endl; //cm
 	
 	double Road_width = 3.5; //m
 	double TSR_depth = 80; // m
 	double TSR_height = -4; // m
 	double camera_height = -1; // m
-	// cv::Point3d ini_camera(-Road_width*3.5,camera_height,0); //m
-	// std::vector<RECT> mapped_Sign; //store mapped pt of TSR
 	
-	VISUALIZER::Camera_Viewer viewer(Intrinsics, VISUALIZER::Pose(Eigen::Matrix3f::Identity(), Eigen::Vector3f(-3, camera_height, 0)));
+	VISUALIZER::Camera_Viewer viewer(Intrinsics, VISUALIZER::Pose(Eigen::Matrix3f::Identity(), Eigen::Vector3f(-Road_width*1.5, camera_height, 0)));
 	std::vector<VISUALIZER::Obj*> vecObj_ptr;
-	vecObj_ptr.push_back(new VISUALIZER::TSR_Obj(scaled_Sign, TSR_height, TSR_depth));
+	
+	vecObj_ptr.push_back(new VISUALIZER::TS_Rect(Scaled_Sign, TSR_height, TSR_depth)); //add TS_Rect
 	for(int i =0; i<4; i++){
 		VISUALIZER::Pose LANE_pose(Eigen::Matrix3f::Identity(), Eigen::Vector3f(-Road_width*i, 0, 0));
-		VISUALIZER::Obj *Obj_ptr = new VISUALIZER::LANE_Obj(100, YELLOW, cv::Point(), LANE_pose);
+		VISUALIZER::Obj *Obj_ptr = new VISUALIZER::LANE(100, YELLOW, cv::Point(), LANE_pose);
 		vecObj_ptr.push_back(Obj_ptr);
+	} // end of LANE creation and push_back
+
+	double path_length = 100; // m
+	std::vector<VISUALIZER::GBRxyzPt> path;
+	path.reserve(path_length*100);
+	for(int i=0; i<path_length*100; i++){//cm
+		double x;
+		if(i>=200){
+			x = SHAPE::tan_path(i,Road_width*100,30*100);
+		} 
+		VISUALIZER::GBRxyzPt Pt(Eigen::Vector3f(x/100,0,static_cast<float>(i)/100),RED);
+		path.push_back(std::move(Pt));
+	} // end of math generation
+	vecObj_ptr.push_back(new VISUALIZER::LANE(path,cv::Point(100,40),  VISUALIZER::Pose(Eigen::Matrix3f::Identity(), Eigen::Vector3f(-Road_width*1.5, 0, 0))));
+
+	std::vector<VISUALIZER::Pose> camera_pose;
+	double speed = 120; // km per hr
+	int FPS = 30;
+	double speed_perframe = (speed*1000/3600)/FPS;
+	auto ref_xyz = vecObj_ptr.back()->get()[0].xyz; //set referenced origin
+	auto offset = Eigen::Vector3f(0,camera_height,0);
+	camera_pose.push_back(VISUALIZER::Pose(Eigen::Matrix3f::Identity(),ref_xyz+offset));
+	int count = 0;
+	for(auto& path_pt: vecObj_ptr.back()->get()){
+		if(path_pt.xyz.z() > TSR_depth-8)
+			break;
+		if(distance(path_pt.xyz,ref_xyz)>speed_perframe){
+			camera_pose.push_back(VISUALIZER::Pose(Eigen::Matrix3f::Identity(),path_pt.xyz+offset));
+			ref_xyz = path_pt.xyz;
+		}
+		count++;
 	}
+	// for(int i = 0; i<camera_pose.size()-1;i++){
+	// 	auto cur = camera_pose[i].T;
+	// 	auto next = camera_pose[i+1].T;
+	// 	auto rad = std::atan2(next.x()-cur.x(),next.z()-cur.z());
+	// 	auto R = Eigen::AngleAxisd(rad,Eigen::Vector3d(0,1,0)).matrix();
+	// 	camera_pose[i].R = R;
+	// }
+	// camera_pose[camera_pose.size()-1].R = camera_pose[camera_pose.size()-2].R;
+	std::cout<<"Given path:"<<distance(camera_pose.front().twc,camera_pose.back().twc)<<"m with speed:"<<speed<<"km/hr, takes "<<camera_pose.size()<<" frames ("<<static_cast<float>(camera_pose.size())/FPS<<" sec)"<<std::endl;
 
-	for(auto& Obj_ptr: vecObj_ptr)
-		viewer.projectToImg(Obj_ptr->get());
+
+	//main loop
+	auto ptr_TS_Rect = dynamic_cast<VISUALIZER::TS_Rect*>(vecObj_ptr.front());
+	ptr_TS_Rect->cal_rect_ref(viewer.getImg().size());
+	std::vector<cv::Point2f> ref_vertex(ptr_TS_Rect->rect_ref.ptArr.get(),ptr_TS_Rect->rect_ref.ptArr.get()+4);
+	for(auto& pose: camera_pose){
+		viewer.setPose(pose);
+
+		for(auto& Obj_ptr: vecObj_ptr) //project all 3D objects
+			viewer.projectToImg(Obj_ptr->get());
+		cv::Mat cur_view = viewer.getImg();
+		ptr_TS_Rect->cal_rect_proj(std::bind(&VISUALIZER::Camera_Viewer::projection,&viewer,std::placeholders::_1));
+		for(int i=0; i<4; i++)
+			cv::circle(cur_view, ptr_TS_Rect->rect_proj.ptArr.get()[i],2,GREEN,-1);
+
+		std::vector<cv::Point2f> proj_vertex(ptr_TS_Rect->rect_proj.ptArr.get(),ptr_TS_Rect->rect_proj.ptArr.get()+4);
+
+		std::vector<cv::Mat> r,t,n;
+		cv::Mat H = cv::findHomography(ref_vertex,proj_vertex);
+		cv::decomposeHomographyMat(H,EigenTocvMat(Intrinsics),r,t,n);
 		
-	cv::imshow("TEST",viewer.getImg());
-	cv::waitKey(0);
+		
+		// // auto ratio_K = K.clone();
+		// // ratio_K.at<double>(1,1) *= y_factor;
+		// cv::decomposeHomographyMat(H,ratio_K,r,t,n);
+
+		for(int i=0; i<r.size(); ++i){
+			pose_recording(pose_stream[i],r.at(i),t.at(i));
+			std::cout<<"n("<<i<<")"<<n.at(i).t()<<std::endl;
+		}
+
+
+		cv::imshow("TEST",cur_view);
+		cv::waitKey(1);
+	}
+	
+
+
+
 
 		
-
-			// // std::vector<Eigen::Vector3d> mapPath;
-			// // double tan_len = 20; // m
-			// // mapPath.reserve(tan_len*100);
-			// // for(int i = 0; i< TSR_depth*100; i+=1){ // i:cm
-			// // 	double x;
-			// // 	if(i<=4000)
-			// // 		x = trajectory_tan(static_cast<double>(i)/100,cv::Point2d(ini_camera.x,20),std::abs(Road_width),tan_len);
-			// // 	else
-			// // 		x = trajectory_tan(static_cast<double>(i)/100,cv::Point2d(mapPath[4000].x(),45),std::abs(Road_width),tan_len);
-			// // 	mapPath.push_back(Eigen::Vector3d(x,0,static_cast<double>(i)/100));
-			// // }
-
-			// std::vector<Eigen::Vector3d> mapPath;
-			// double tan_len = 30; // m
-			// mapPath.reserve(tan_len*100);
-			// for(int i = 0; i< (TSR_depth-15)*100; i+=1){ // i:cm
-			// 	double x;
-			// 		x = trajectory_tan(static_cast<double>(i)/100,cv::Point2d(ini_camera.x,20),std::abs(Road_width),tan_len);
-			// 	mapPath.push_back(Eigen::Vector3d(x,0,static_cast<double>(i)/100));
-			// }
-
-			// std::vector<Camera_Motion> camera_pose;
-			// double speed = 120; //km/hr
-			// int FPS = 30;
-			// double speed_perframe = (speed*1000/3600)/FPS;
-
-			// // int step = (TSR_depth-12)/speed_perframe;
-			// // std::cout<< (TSR_depth-12)<<"m for "<<speed<<" km/hr, takes "<<step<<" frames ("<<step/30<<" sec)"<<std::endl;
-			// // std::vector<double> tmp{0,-1,-2,-3,-4,-5,-4,-3,-2,-1,0,0,0,0,0};
-			// // std::vector<double> car_yaw;
-			// // for(int i = 0; i<4; i++)
-			// // 	car_yaw.insert(car_yaw.end(),tmp.begin(),tmp.end());
-
-			// // for(int i = 0; i<step; i++){
-			// // 	Camera_Motion state(Eigen::AngleAxisd(degTorad(car_yaw[i]),Eigen::Vector3d(0,1,0)).matrix(),Eigen::Vector3d(ini_camera.x,ini_camera.y,i));
-			// // 	camera_pose.push_back(state);
-			// // }
-
-			// auto ref_pt = mapPath[0];
-			// camera_pose.push_back(Camera_Motion(Eigen::Matrix3d::Identity(),mapPath[0]+Eigen::Vector3d(0,camera_height,0)));
-			// int count = 0;
-			// for(auto& path_pt: mapPath){
-			// 	if(path_pt.z() > TSR_depth-8)
-			// 		break;
-			// 	if(dis_Vector3d(path_pt,ref_pt)>speed_perframe){
-			// 		camera_pose.push_back(Camera_Motion(Eigen::Matrix3d::Identity(),path_pt+Eigen::Vector3d(0,camera_height,0)));
-			// 		ref_pt = path_pt;
-			// 	}
-			// 	count++;
-			// }
-			// for(int i = 0; i<camera_pose.size()-1;i++){
-			// 	auto cur = camera_pose[i].T;
-			// 	auto next = camera_pose[i+1].T;
-			// 	auto rad = std::atan2(next.x()-cur.x(),next.z()-cur.z());
-			// 	auto R = Eigen::AngleAxisd(rad,Eigen::Vector3d(0,1,0)).matrix();
-			// 	camera_pose[i].R = R;
-			// }
-			// camera_pose[camera_pose.size()-1].R = camera_pose[camera_pose.size()-2].R;
-			// std::cout<<"Frames: "<<camera_pose.size()<<std::endl;
 
 			// for(auto& state:camera_pose){
 			// 	RECT rect;
@@ -200,9 +188,9 @@ int main(int argc, char** argv){
 
 			// 	//project sign
 			// 	Eigen::Vector3d pcam1,pcam2,pcam3;
-			// 	for(int y = 0; y < scaled_Sign.rows; y++)
-			// 		for(int x = 0; x < scaled_Sign.cols; x++){
-			// 			Eigen::Vector3d pt_world = Pixe2DtoPt3D(x,y,scaled_Sign.size(),TSR_height,TSR_depth);
+			// 	for(int y = 0; y < Scaled_Sign.rows; y++)
+			// 		for(int x = 0; x < Scaled_Sign.cols; x++){
+			// 			Eigen::Vector3d pt_world = Pixe2DtoPt3D(x,y,Scaled_Sign.size(),TSR_height,TSR_depth);
 			// 			Eigen::Vector3d pt_camera = state.R.inverse()*(pt_world-state.T); //p_world to p_camera
 
 			// 			if(y==0 && x==0)

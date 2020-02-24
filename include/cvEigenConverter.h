@@ -5,6 +5,22 @@
 #include <Eigen/Core>
 
 
+
+template <typename T>
+inline double distance(const Eigen::Matrix<T,3,1>& lhs,const Eigen::Matrix<T,3,1>& rhs = Eigen::Matrix<T,3,1>(0,0,0)){
+    double res = std::pow(std::abs(rhs(0,0)-lhs(0,0)),2) + std::pow(std::abs(rhs(1,0)-lhs(1,0)),2) + std::pow(std::abs(rhs(2,0)-lhs(2,0)),2);
+    return std::sqrt(res);
+}
+
+
+inline Eigen::Matrix<double,3,3> toMatrix3d(const cv::Mat& cvMat3){
+    Eigen::Matrix<double,3,3> M;
+    for(int i=0;i<3;i++)
+        for(int j=0; j<3; j++)
+            M(i,j) = cvMat3.at<double>(i,j);
+    return M;
+}
+
 template<typename T, int cols, int rows>
 Eigen::Matrix<T, cols, rows> cvToEigenMat(const cv::Matx<T,cols,rows>& cvMat){
     Eigen::Matrix<T,cols,rows> M;
