@@ -18,6 +18,8 @@
 #include "opencv2/core/core.hpp"
 #include "opencv2/opencv.hpp"
 #include "opencv2/tracking.hpp"
+#include "opencv2/features2d/features2d.hpp"
+
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
@@ -85,12 +87,13 @@ void on_mouse(int EVENT, int x, int y, int flags, void* ustc);
 void Label_GW_TSR_pt(const std::string& video_path);
 void TEST_HOMO(const std::string& video_path);
 std::vector<cv::Point> arr2vec(cv::Point* arr, int num);
+cv::Rect scaling_Rect(cv::Rect rect, double factor);
 
 
 void pose_recording(std::fstream& os, cv::Mat& R, cv::Mat& T);
 void pnp(std::vector<cv::Point3f>& Pt_3D, std::vector<cv::Point2f>& projected_pt, cv::Mat K);
 void Homography(std::vector<cv::Point2f>& ref_vertex,std::vector<cv::Point2f>& proj_vertex, cv::Mat K);
-
+double calculate_time(const std::chrono::steady_clock::time_point& _start);
 
 #endif 
 

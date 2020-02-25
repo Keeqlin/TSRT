@@ -1,6 +1,5 @@
 #include "utility.h"
 
-
         
 std::vector<std::string> getline_and_prasingstr(std::fstream& fs, const std::string& delim){
     std::vector<std::string> vstr;
@@ -180,49 +179,73 @@ void TEST_HOMO(const std::string& video_path){
         for(int i =0; i<pt_num; i++){
             cv::circle(Img,arr[i],3,RED,-1);
             if(i!=pt_num-1)
-                cv::line(Img,arr[i],arr[i+1],BLUE,2);
+                cv::line(Img,arr[i],arr[i+1],BLUE,1);
             if(i==pt_num-1)
-                cv::line(Img,arr[pt_num-1],arr[0],BLUE,2);
+                cv::line(Img,arr[pt_num-1],arr[0],BLUE,1);
         }
     };
+
+    //key point detector
+    // auto detector = cv::ORB::create(); 
+    auto detector = cv::FastFeatureDetector::create();
+
     while(cap.read(Img)){
+        if(Img.empty())
+            break;
         OriImg = Img.clone();
         auto vstr = getline_and_prasingstr(fs, " ,[]");
+        
+        //extract ground truth from txt
+        pt_num = (vstr.size()-1)/2;
+        cv::Point labeled_pts[pt_num];
         if(vstr.size()>1){
-            pt_num = (vstr.size()-1)/2;
-            cv::Point labeled_pts[pt_num];
             for(int i= 1; i<=pt_num; i++){
                 labeled_pts[i-1] = cv::Point(std::stoi(vstr[i*2-1]),std::stoi(vstr[i*2]));
             }
             draw_line(labeled_pts);
 
-            // cv::Mat h = cv::findHomography(arr2vec(labeled_pts,4),arr2vec(Homo_pt,4));
-            // cv::warpPerspective(OriImg,Homography,h,cv::Size(length,length));
-            // cv::Point2f Homo_center = cv::Point2f(length/2,length/2);
-            // cv::circle(Homography,Homo_center,2,GREEN,-1);            
-            // cv::imshow("HOMO_trans",Homography);   
 
-            // cv::Mat inverse;
-            // cv::Point2f inv_Homo_center = h.inv()*Homo_center;
-            // cv::warpPerspective(Homography,inverse,h.inv(),Img.size());
-            // cv::imshow("Inv",inverse);
-            // cv::circle(Img,inv_Homo_center,2,GREEN,-1);
-
-            cv::Point2f bbox_center = cv::Point2f(0,0);
-            for(int i =0; i<pt_num; i++){
-                bbox_center.x += labeled_pts[i].x;
-                bbox_center.y += labeled_pts[i].y;
-            }
-            bbox_center /= 4;
-            cv::circle(Img,bbox_center,2,RED,-1);
-
+            // cv::Point2f bbox_center = cv::Point2f(0,0);
+            // for(int i =0; i<pt_num; i++){
+            //     bbox_center.x += labeled_pts[i].x;
+            //     bbox_center.y += labeled_pts[i].y;
+            // }
+            // bbox_center /= 4;
+            // cv::circle(Img,bbox_center,2,RED,-1);
         }
+
+        //detect ORB kp
+        auto start = std::chrono::steady_clock::now();
+        cv::Mat mask(OriImg.size(),CV_8UC1,cv::Scalar::all(0));
+        std::vector<cv::KeyPoint> keypoints; 
+        cv::Rect ROI = cv::boundingRect(std::vector<cv::Point>(labeled_pts,labeled_pts+pt_num));
+        ROI = scaling_Rect(ROI,1.5);
+        mask(ROI).setTo(cv::Scalar::all(255));
+        detector->detect(OriImg, keypoints,mask); 
+        std::cout<<"keypoint detection elapsed "<<calculate_time(start)<<" ms"<<std::endl;
+        cv::rectangle(Img, ROI, RED);
+
+
+        for(auto& kp: keypoints)
+            cv::circle(Img,kp.pt,1,GREEN);
+
 
         cv::imshow("HOMO",Img);
         cv::waitKey(0);
         // cv::waitKey(FPS);
     }
 }
+
+cv::Rect scaling_Rect(cv::Rect rect, double factor){
+    auto size = cv::Size(rect.width*factor,rect.height*factor);
+    rect = rect + size; 
+    cv::Point pt;  
+    pt.x = cvRound(size.width/2.0);  
+    pt.y = cvRound(size.height/2.0); 
+    auto center = (rect.br()+rect.tl())/2;
+    return (rect-pt);
+}
+
 
 std::vector<cv::Point> arr2vec(cv::Point* arr, int num){
     std::vector<cv::Point> vecpt;
@@ -294,13 +317,17 @@ void Homography(std::vector<cv::Point2f>& ref_vertex,std::vector<cv::Point2f>& p
     }
     
     std::vector<cv::Mat> r,t,n;
+    auto start = std::chrono::steady_clock::now();
 	cv::Mat H = cv::findHomography(ref_vertex,proj_vertex);
 	cv::decomposeHomographyMat(H,K,r,t,n);
+    std::cout<<"decomposeHomographyMat elapsed "<<calculate_time(start)<<" ms"<<std::endl;
+
     		
 	// // auto ratio_K = K.clone();
 	// // ratio_K.at<double>(1,1) *= y_factor;
 	// cv::decomposeHomographyMat(H,ratio_K,r,t,n);
 
+    int count = 0;
     for(int i=0;i<n.size(); i++){
         cv::Mat Rcw = r[i].inv();
         cv::Mat tcw = -Rcw*t[i];
@@ -309,8 +336,18 @@ void Homography(std::vector<cv::Point2f>& ref_vertex,std::vector<cv::Point2f>& p
         // std::cout<<"Sol_"<<i<<std::endl;
         // std::cout<<"\tHomo_tcw:"<<tcw.t()<<std::endl;
         // std::cout<<"\tHomo_pyr_cw: "<<Rvec.t()*DegperRad<<std::endl<<std::endl;
+        // if(tcw.at<float>(2,0)>0)
+        //     continue;
+        // decomposedH_stream[count]<<tcw.t()<<','<<Rvec.t()*DegperRad<<std::endl;
+        // count++;
         decomposedH_stream[i]<<tcw.t()<<','<<Rvec.t()*DegperRad<<std::endl;
     }
+}
+
+
+double calculate_time(const std::chrono::steady_clock::time_point& _start){
+    auto end = std::chrono::steady_clock::now();
+    return std::chrono::duration <double, std::milli> (end-_start).count();
 }
 
 
