@@ -40,12 +40,10 @@ class npt_shape{
                 ptArr.get()[vertex] += ptArr.get()[i];
             ptArr.get()[vertex] = ptArr.get()[vertex]/4;
         }
-    // private:
         //start with the most upper-left pt in clock-wise direction
         std::shared_ptr<cv::Point2f> ptArr;
         int num_pt;
 };
-
 using RECT = npt_shape<4>;
 
 } // namespace SHAPE

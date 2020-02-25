@@ -1,4 +1,5 @@
 #include "visualizer.h"
+#include "utility.h"
 
 namespace VISUALIZER{
 
@@ -13,7 +14,7 @@ void Camera_Viewer::setPose(const Pose& _pose){
 }
 
 void Camera_Viewer::projectToImg(const std::vector<GBRxyzPt>& pointcloud){
-    // vanish point: very far point
+    // vanish point: very far point: 1000m
     Eigen::Vector3f vp_world(pose.twc.x(),pose.twc.y(),1000);
     cv::Point2f vp_img = projection(vp_world);
 
@@ -53,12 +54,12 @@ void Obj::PposeToPw(){
 
 TS_Rect::TS_Rect(cv::Mat _TS_img, double TS_height_pose, double TS_depth_pose, const Pose &TS_pose) : Obj(TS_pose){
     TS_img = _TS_img.clone();
-    pointcloud.reserve(TS_img.cols*TS_img.rows+5*TS_depth_pose*100); // 1 pixel = 1 cm
+    pointcloud.reserve(TS_img.cols*TS_img.rows+5*TS_depth_pose*mTOcm); // 1 pixel = 1 cm
     //obj creation based on current pose
     for(int y=0; y<TS_img.rows; y++)
         for(int x=0; x<TS_img.cols; x++){
             auto pt = pixelToCam(cv::Point(x,y),TS_img.size());
-            GBRxyzPt Pt(Eigen::Vector3f(static_cast<float>(pt.x)/100, static_cast<float>(pt.y)/100+TS_height_pose, TS_depth_pose), TS_img.at<cv::Vec3b>(y, x));
+            GBRxyzPt Pt(Eigen::Vector3f(pt.x*cmTOm, pt.y*cmTOm+TS_height_pose, TS_depth_pose), TS_img.at<cv::Vec3b>(y, x));
             if(y==0 && x==0)
 				Conrner_3D[0] = Pt.xyz;
 			if(y==0 && x==TS_img.cols-1)
@@ -71,10 +72,10 @@ TS_Rect::TS_Rect(cv::Mat _TS_img, double TS_height_pose, double TS_depth_pose, c
             pointcloud.push_back(std::move(Pt));
         }
     int TS_bar_width = 5; //cm
-    TS_height_pose += static_cast<float>(TS_img.rows)/200;
+    TS_height_pose += TS_img.rows*cmTOm/2;
     for(int x = -TS_bar_width / 2; x <= TS_bar_width / 2; x++) 
-        for(int y = TS_height_pose * 100; y < 0; y++){
-            GBRxyzPt Pt(Eigen::Vector3f(static_cast<float>(x)/100, static_cast<float>(y)/100, TS_depth_pose), WHITE);
+        for(int y = TS_height_pose * mTOcm; y < 0; y++){
+            GBRxyzPt Pt(Eigen::Vector3f(x*cmTOm, y*cmTOm, TS_depth_pose), WHITE);
             pointcloud.push_back(std::move(Pt));
         }
     //convert pts to world coordinate system
@@ -97,10 +98,10 @@ void TS_Rect::cal_rect_proj(std::function<cv::Point2f(const Eigen::Vector3f&)> p
 }
 
 LANE::LANE(double LANE_len, const cv::Vec3b &color, const cv::Point &dash_para, const Pose &LANE_pose):Obj(LANE_pose){
-    pointcloud.reserve(LANE_len*100);
+    pointcloud.reserve(LANE_len*mTOcm);
     //obj creation based on current pose
-    for(int i = 0; i<LANE_len*100; i++){
-        GBRxyzPt Pt(Eigen::Vector3f(0,0,static_cast<float>(i)/100),color);
+    for(int i = 0; i<LANE_len*mTOcm; i++){
+        GBRxyzPt Pt(Eigen::Vector3f(0,0,i*cmTOm),color);
         pointcloud.push_back(std::move(Pt));
     }
     //convert pts to world coordinate system

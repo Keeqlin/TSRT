@@ -49,16 +49,7 @@ int main(int argc, char** argv){
 	// 	cv::imshow("preview", Img);
 	// 	cv::waitKey(cap.get(CV_CAP_PROP_FPS));
 	// }
-
-
-
-	// use for recording pose estimation of decomposedH
-	std::vector<std::fstream> pose_stream;
-	for(int i=0; i<4; i++){
-		std::string name = "decompose_H_pose";
-		std::fstream os(std::string(name+std::to_string(i)+".txt").c_str(), std::ios::out | std::ios::trunc);
-		pose_stream.push_back(std::move(os));
-	}
+	
 
 	// // SLAM 14 courses: pp.100 
 	// // camera configuration (first pirority)
@@ -85,27 +76,38 @@ int main(int argc, char** argv){
 	double TSR_height = -4; // m
 	double camera_height = -1; // m
 	
-	VISUALIZER::Camera_Viewer viewer(Intrinsics, VISUALIZER::Pose(Eigen::Matrix3f::Identity(), Eigen::Vector3f(-Road_width*1.5, camera_height, 0)));
-	std::vector<VISUALIZER::Obj*> vecObj_ptr;
+
+	Eigen::Matrix3f camera_pyr_config = Eigen::AngleAxisf(-10*RadperDeg,Eigen::Vector3f(1,0,0)).toRotationMatrix();
+	VISUALIZER::Camera_Viewer viewer(Intrinsics, VISUALIZER::Pose(camera_pyr_config, Eigen::Vector3f(-Road_width*1.5, camera_height, 0)));
+	std::vector<VISUALIZER::Obj*> vecObj_ptr; 
 	
-	vecObj_ptr.push_back(new VISUALIZER::TS_Rect(Scaled_Sign, TSR_height, TSR_depth)); //add TS_Rect
+	// Add TS_Rect
+	vecObj_ptr.push_back(new VISUALIZER::TS_Rect(Scaled_Sign, TSR_height, TSR_depth));
+	auto ptr_TS_Rect = dynamic_cast<VISUALIZER::TS_Rect*>(vecObj_ptr.front());
+	ptr_TS_Rect->cal_rect_ref(viewer.getImg().size());
+	std::vector<cv::Point2f> ref_vertex(ptr_TS_Rect->rect_ref.ptArr.get(),ptr_TS_Rect->rect_ref.ptArr.get()+4);
+	std::vector<cv::Point3f> TS_3d; //use for pnp verification
+	for(int i =0; i<4; i++)
+		TS_3d.push_back(EigenVecTocvPt(ptr_TS_Rect->Conrner_3D[i]));
+
+	
+	double path_length = 100; // m
 	for(int i =0; i<4; i++){
 		VISUALIZER::Pose LANE_pose(Eigen::Matrix3f::Identity(), Eigen::Vector3f(-Road_width*i, 0, 0));
-		VISUALIZER::Obj *Obj_ptr = new VISUALIZER::LANE(100, YELLOW, cv::Point(), LANE_pose);
+		VISUALIZER::Obj *Obj_ptr = new VISUALIZER::LANE(path_length, YELLOW, cv::Point(), LANE_pose);
 		vecObj_ptr.push_back(Obj_ptr);
-	} // end of LANE creation and push_back
+	} // end of LANE creation and adding
 
-	double path_length = 100; // m
 	std::vector<VISUALIZER::GBRxyzPt> path;
-	path.reserve(path_length*100);
-	for(int i=0; i<path_length*100; i++){//cm
+	path.reserve(path_length*mTOcm);
+	for(int i=0; i<path_length*mTOcm; i++){//cm
 		double x;
 		if(i>=200){
-			x = SHAPE::tan_path(i,Road_width*100,30*100);
+			x = SHAPE::tan_path(i,Road_width*mTOcm,30*mTOcm);
 		} 
-		VISUALIZER::GBRxyzPt Pt(Eigen::Vector3f(x/100,0,static_cast<float>(i)/100),RED);
+		VISUALIZER::GBRxyzPt Pt(Eigen::Vector3f(x*cmTOm,0,i*cmTOm),RED);
 		path.push_back(std::move(Pt));
-	} // end of math generation
+	} // end of path generation
 	vecObj_ptr.push_back(new VISUALIZER::LANE(path,cv::Point(100,40),  VISUALIZER::Pose(Eigen::Matrix3f::Identity(), Eigen::Vector3f(-Road_width*1.5, 0, 0))));
 
 	std::vector<VISUALIZER::Pose> camera_pose;
@@ -113,14 +115,14 @@ int main(int argc, char** argv){
 	int FPS = 30;
 	double speed_perframe = (speed*1000/3600)/FPS;
 	auto ref_xyz = vecObj_ptr.back()->get()[0].xyz; //set referenced origin
-	auto offset = Eigen::Vector3f(0,camera_height,0);
-	camera_pose.push_back(VISUALIZER::Pose(Eigen::Matrix3f::Identity(),ref_xyz+offset));
+	auto camera_height_offset = Eigen::Vector3f(0,camera_height,0);
+	camera_pose.push_back(VISUALIZER::Pose(camera_pyr_config,ref_xyz+camera_height_offset));
 	int count = 0;
 	for(auto& path_pt: vecObj_ptr.back()->get()){
 		if(path_pt.xyz.z() > TSR_depth-8)
 			break;
 		if(distance(path_pt.xyz,ref_xyz)>speed_perframe){
-			camera_pose.push_back(VISUALIZER::Pose(Eigen::Matrix3f::Identity(),path_pt.xyz+offset));
+			camera_pose.push_back(VISUALIZER::Pose(camera_pyr_config,path_pt.xyz+camera_height_offset));
 			ref_xyz = path_pt.xyz;
 		}
 		count++;
@@ -133,24 +135,17 @@ int main(int argc, char** argv){
 	// 	camera_pose[i].R = R;
 	// }
 	// camera_pose[camera_pose.size()-1].R = camera_pose[camera_pose.size()-2].R;
-	std::cout<<"Given path:"<<distance(camera_pose.front().twc,camera_pose.back().twc)<<"m with speed:"<<speed<<"km/hr, takes "<<camera_pose.size()<<" frames ("<<static_cast<float>(camera_pose.size())/FPS<<" sec)"<<std::endl;
+	std::cout<<"Given path:"<<distance(camera_pose.front().twc,camera_pose.back().twc)<<"m with speed:"<<speed<<"km/hr, it takes "<<camera_pose.size()<<" frames ("<<static_cast<float>(camera_pose.size())/FPS<<" sec)"<<std::endl;
 
 
 	//main loop
-	// pnp verification
-
-	auto ptr_TS_Rect = dynamic_cast<VISUALIZER::TS_Rect*>(vecObj_ptr.front());
-	ptr_TS_Rect->cal_rect_ref(viewer.getImg().size());
-	std::vector<cv::Point2f> ref_vertex(ptr_TS_Rect->rect_ref.ptArr.get(),ptr_TS_Rect->rect_ref.ptArr.get()+4);
-	std::vector<cv::Point3f> TS_3d;
-	for(int i =0; i<4; i++)
-		TS_3d.push_back(EigenVecTocvPt(ptr_TS_Rect->Conrner_3D[i]));
-	auto KK = EigenTocvMat(Intrinsics);
-	pnp(TS_3d,ref_vertex,KK);
+	auto K = EigenTocvMat(Intrinsics);
+	pnp(TS_3d,ref_vertex,K);
 	for(auto& pose: camera_pose){
 		viewer.setPose(pose);
 
-		for(auto& Obj_ptr: vecObj_ptr) //project all 3D objects
+		//project all 3D objects
+		for(auto& Obj_ptr: vecObj_ptr) 
 			viewer.projectToImg(Obj_ptr->get());
 		cv::Mat cur_view = viewer.getImg();
 		ptr_TS_Rect->cal_rect_proj(std::bind(&VISUALIZER::Camera_Viewer::projection,&viewer,std::placeholders::_1));
@@ -158,113 +153,12 @@ int main(int argc, char** argv){
 			cv::circle(cur_view, ptr_TS_Rect->rect_proj.ptArr.get()[i],2,GREEN,-1);
 
 		std::vector<cv::Point2f> proj_vertex(ptr_TS_Rect->rect_proj.ptArr.get(),ptr_TS_Rect->rect_proj.ptArr.get()+4);
-		pnp(TS_3d,proj_vertex,KK); //pnp verification
-		Homography(ref_vertex,proj_vertex,KK);
+		pnp(TS_3d,proj_vertex,K); //pnp verification
+		Homography(ref_vertex,proj_vertex,K);
 
-		cv::imshow("TEST",cur_view);
+		cv::imshow("viewer",cur_view);
 		cv::waitKey(1);
 	}
-
-
-
-	// set up a virtual camera
-  	float f = 100, w = 640, h = 480;
-
-  	cv::Mat1f K = (cv::Mat1f(3, 3) <<
-    	  f, 0, w/2,
-      	  0, f, h/2,
-          0, 0,   1);
-
-  	// set transformation from 1st to 2nd camera (assume K is unchanged)
-  	cv::Mat1f rvecDeg = (cv::Mat1f(3, 1) << 0, 0, 0);
-  	cv::Mat1f t = (cv::Mat1f(3, 1) << 10, 0, 66);
-
-  	std::cout << "-------------------------------------------\n";
-  	std::cout << "Ground truth:\n";
-
-  	std::cout << "K = \n" << K << std::endl << std::endl;
-  	std::cout << "rvec = \n" << rvecDeg << std::endl << std::endl;
-  	std::cout << "t = \n" << t << std::endl << std::endl;
-
-  	// set up points on a plane
-  	std::vector<cv::Point3f> p3d{{0, 0, 50},
-                               	{100, 0, 50},
-                               	{0, 100, 50},
-                               	{100, 100, 50}};
-
-  	// project on both cameras
-  	std::vector<cv::Point2f> Q, P, S;
-  	cv::Mat projec_img = cv::Mat::zeros(cv::Size(w,h),CV_8UC3);
-
-  	cv::Mat1f t1 = (cv::Mat1f(3, 1) << 10, 0, 0);
-  	cv::projectPoints(p3d,
-                      cv::Mat1d::zeros(3, 1),
-                      cv::Mat1d::zeros(3, 1),
-                      K,
-                      cv::Mat(),
-                      Q);
-    std::cout<<"projected Q:\n";
-   	for(auto& pt: Q){
-		std::cout<<pt<<" ";
-		cv::circle(projec_img, pt,2,GREEN,-1);
-   	}
-   	std::cout<<std::endl;
-
-  	cv::projectPoints(p3d,
-                    rvecDeg*CV_PI/180,
-                    t,
-                    K,
-                    cv::Mat(),
-                    P);
-
-	std::cout<<"projected P:\n";
-   	for(auto& pt: P){
-		std::cout<<pt<<" ";
-		cv::circle(projec_img, pt,2,RED,-1);
-   	}
-
-  	// find homography
-  	cv::Mat H = cv::findHomography(Q, P);
-  	std::cout << "-------------------------------------------\n";
-  	std::cout << "Estimated H = \n" << H << std::endl << std::endl;
-
-  	// check by reprojection
-  	std::vector<cv::Point2f> P_(P.size());
-  	cv::perspectiveTransform(Q, P_, H);
-  	float sumError = 0;
-  	for (size_t i = 0; i < P.size(); i++)
-    	sumError += cv::norm(P[i] - P_[i]);
-
-  	std::cout << "-------------------------------------------\n";
-  	std::cout << "Average reprojection error = "
-      	      << sumError/P.size() << std::endl << std::endl;
-
-  	// decompose using identity as internal parameters matrix
-  	std::vector<cv::Mat> Rs, Ts;
-  	cv::decomposeHomographyMat(H,
-                               K,
-                               Rs, Ts,
-                               cv::noArray());
-  	std::cout << "-------------------------------------------\n";
-  	std::cout << "Estimated decomposition:\n\n";
-  	std::cout << "rvec = " << std::endl;
-  	for (auto R_ : Rs) {
-    	cv::Mat1d rvec;
-    	cv::Rodrigues(R_, rvec);
-    	std::cout << rvec*180/CV_PI << std::endl << std::endl;
-  	}
-	std::cout << std::endl;
-
-  	std::cout << "t = " << std::endl;
-  	for (auto t_ : Ts) {
-    	std::cout << t_ << std::endl << std::endl;
-  	}
-	
-	std::cout<<std::endl;
-   	cv::circle(projec_img,cv::Point(w/2,h/2),2,WHITE,-1);
-   	cv::imshow("2123",projec_img);
-   	cv::waitKey(0);
-	return 0;
 }
 
 std::vector<Mat> read_BTSD_Seq(const std::string& path, int index_start, const std::string& zero_num, const std::string& img_format, const std::string& prefix){
@@ -372,3 +266,4 @@ std::vector<TSR> read_BTSD_GT(const std::string& ground_truth_path, unsigned int
 
 	return vTSR;
 }
+

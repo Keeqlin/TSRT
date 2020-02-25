@@ -25,8 +25,7 @@ find_package(Boost REQUIRED )
 
 # If the package has been found, several variables will
 # be set, you can find the full list with descriptions
-# in the OpenCVConfig.cmake file.
-# Print some message showing some of them
+# in the ${Library}Config.cmake file.
 message(STATUS "OpenCV library status:")
 message(STATUS "    version: ${OpenCV_VERSION}")
 message(STATUS "    libraries: ${OpenCV_LIBS}")
@@ -52,5 +51,5 @@ FILE(GLOB SOURCE
 
 # Declare the executable target built from your sources
 add_executable( ${PROJECT_NAME} ${SOURCE} )
-# Link your application with OpenCV libraries
+# Link your application with specific libraries
 target_link_libraries( ${PROJECT_NAME} ${OpenCV_LIBS} ${Boost_LIBRARIES})

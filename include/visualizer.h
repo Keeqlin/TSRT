@@ -18,12 +18,6 @@
 
 namespace VISUALIZER{
 
-#define RED cv::Vec3b(0,0,255)
-#define BLUE cv::Vec3b(255, 0, 0)
-#define GREEN cv::Vec3b(0,255,0)
-#define YELLOW cv::Vec3b(0,255,255)
-#define WHITE cv::Vec3b(255, 255, 255)
-
 //  right-hand coordinate systm (unit: m)
 //  (+x,+y,+z): right, down, front
 //  (x-axis, y-axis, z-axis): pitch, yaw, roll 
@@ -76,10 +70,6 @@ public:
     Eigen::Vector3f tcw;
 };
 
-// inline std::ostream &operator<<(std::ostream &os, const pose &rhs){
-//     os << "tw xyz"<< rhs.xyz<<", GBR"<< rhs.GBR;
-//     return os;
-// }
 
 class Camera_Viewer{
 public:

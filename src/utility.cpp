@@ -238,18 +238,6 @@ std::vector<cv::Point> arr2vec(cv::Point* arr, int num){
 
 
 
-double degTorad(double deg){
-    if(deg<0)
-        deg+=360;
-    return deg*M_PI/180;
-}
-
-double radTodeg(double rad){
-    return rad/M_PI*180;
-}
-
-
-
 
 
 void pose_recording(std::fstream& os, cv::Mat& R, cv::Mat& T){
@@ -270,30 +258,13 @@ void pose_recording(std::fstream& os, cv::Mat& R, cv::Mat& T){
 }
 
 
-
-void getAnglesformR(cv::Mat R, double &angleX, double &angleY, double &angleZ)
-{
-    cv::Mat1d rvec;
-    cv::Rodrigues(R, rvec);
-    rvec = rvec*180/CV_PI;
-    angleX = rvec(0);
-    angleY = rvec(1);
-    angleZ = rvec(2);
-
-    auto T = [](double& deg){
-        deg += 180;
-        if(deg>360)
-            deg -= 360;
-        if(deg>359 && deg<360)
-            deg = 360 - deg;
-    };
-//     T(angleX);
-//     T(angleY);
-//     T(angleZ);
-}
-
-
 void pnp(std::vector<cv::Point3f>& Pt_3D, std::vector<cv::Point2f>& projected_pt, cv::Mat K){
+    static std::fstream pnp_stream;
+    if(!pnp_stream){
+        std::string name = "./../pnp_pose";
+		pnp_stream.open(std::string(name+".txt").c_str(), std::ios::out | std::ios::trunc);
+    }
+    
     cv::Mat Rvec;
 	cv::Mat_<float> Tvec;
 	cv::Mat raux, taux;
@@ -302,18 +273,26 @@ void pnp(std::vector<cv::Point3f>& Pt_3D, std::vector<cv::Point2f>& projected_pt
 	raux.convertTo(Rvec, CV_32F);    //旋转向量
 	taux.convertTo(Tvec, CV_32F);   //平移向量
 	cv::Rodrigues(Rvec, rotMat);  //由于solvePnP返回的是旋转向量，故用罗德里格斯变换变成旋转矩阵
-
-	//格式转换
-	auto R_n = toMatrix3d(rotMat);
-	Eigen::Vector3f T_n(Tvec.at<float>(0,0),Tvec.at<float>(0,1),Tvec.at<float>(0,2));
-	Eigen::Vector3f P_oc =  -R_n.inverse()*T_n;
-	std::cout<<"P_wc: ("<<P_oc.transpose()<<")m"<<std::endl;    
+	
+    auto Rcw = rotMat.inv();
+    auto tcw = -Rcw*Tvec;
+    // std::cout<<"tcw: "<<tcw.t()<<"m"<<std::endl;
+    // std::cout<<"pyr_cw: "<<-Rvec.t()*DegperRad<<std::endl<<std::endl;
+    pnp_stream<<tcw.t()<<','<<-Rvec.t()*DegperRad<<std::endl;
 }
 
 
-
-
 void Homography(std::vector<cv::Point2f>& ref_vertex,std::vector<cv::Point2f>& proj_vertex,  cv::Mat K){
+    // use for recording pose estimation of decomposedH
+    static std::vector<std::fstream> decomposedH_stream;
+    if(decomposedH_stream.size() == 0){
+        for(int i=0; i<4; i++){
+		std::string name = "./../decompose_H_pose";
+		std::fstream os(std::string(name+std::to_string(i)+".txt").c_str(), std::ios::out | std::ios::trunc);
+		decomposedH_stream.push_back(std::move(os));
+	    }
+    }
+    
     std::vector<cv::Mat> r,t,n;
 	cv::Mat H = cv::findHomography(ref_vertex,proj_vertex);
 	cv::decomposeHomographyMat(H,K,r,t,n);
@@ -322,7 +301,16 @@ void Homography(std::vector<cv::Point2f>& ref_vertex,std::vector<cv::Point2f>& p
 	// // ratio_K.at<double>(1,1) *= y_factor;
 	// cv::decomposeHomographyMat(H,ratio_K,r,t,n);
 
-    // for(int i=0; i<r.size(); ++i){
-	// 	pose_recording(pose_stream[i],r.at(i),t.at(i));
-	// }
+    for(int i=0;i<n.size(); i++){
+        cv::Mat Rcw = r[i].inv();
+        cv::Mat tcw = -Rcw*t[i];
+        cv::Mat Rvec;
+        cv::Rodrigues(Rcw,Rvec);
+        // std::cout<<"Sol_"<<i<<std::endl;
+        // std::cout<<"\tHomo_tcw:"<<tcw.t()<<std::endl;
+        // std::cout<<"\tHomo_pyr_cw: "<<Rvec.t()*DegperRad<<std::endl<<std::endl;
+        decomposedH_stream[i]<<tcw.t()<<','<<Rvec.t()*DegperRad<<std::endl;
+    }
 }
+
+

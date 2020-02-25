@@ -23,12 +23,6 @@
 #include <Eigen/Geometry>
 #include "cvEigenConverter.h"
 
-
-#define BLUE cv::Scalar(255,0,0)
-#define RED cv::Scalar(0,0,255)
-#define GREEN cv::Scalar(0,255,0)
-
-
 #define CODE_POS "...@"<<__func__<<" in "<<__FILE__ <<":"<< __LINE__<<"\n"
 #define LOG_MSG(msg) {std::cerr<<"[Log]: "<<msg<<CODE_POS;}
 #define ERROR_MSG(msg) {std::cerr<<"[Error]: "<<msg<<CODE_POS;}
@@ -42,6 +36,18 @@
 
 const std::string BTSD_root_path = "/home/leon/GallopWave/TSR_Dataset/BelgiumTSD/";
 const std::string BTSD_sample_img_path = BTSD_root_path+"DefinedTS/img/";
+
+#define RED cv::Vec3b(0,0,255)
+#define BLUE cv::Vec3b(255, 0, 0)
+#define GREEN cv::Vec3b(0,255,0)
+#define YELLOW cv::Vec3b(0,255,255)
+#define WHITE cv::Vec3b(255, 255, 255)
+
+const float DegperRad = 180.0/M_PI;
+const float RadperDeg = M_PI/180.0;
+const float cmTOm = 1.0/100;
+const float mTOcm = 100;
+
 
 
 class TSR{
@@ -81,11 +87,7 @@ void TEST_HOMO(const std::string& video_path);
 std::vector<cv::Point> arr2vec(cv::Point* arr, int num);
 
 
-// Image center (assume cm )is origin of world coordinate
-double degTorad(double deg);
-double radTodeg(double rad);
 void pose_recording(std::fstream& os, cv::Mat& R, cv::Mat& T);
-void getAnglesformR(cv::Mat R, double &angleX, double &angleY, double &angleZ);
 void pnp(std::vector<cv::Point3f>& Pt_3D, std::vector<cv::Point2f>& projected_pt, cv::Mat K);
 void Homography(std::vector<cv::Point2f>& ref_vertex,std::vector<cv::Point2f>& proj_vertex, cv::Mat K);
 
