@@ -85,7 +85,7 @@ std::vector<std::string> getline_and_prasingstr(std::fstream& fs, const std::str
 void crop_video(const std::string& raw_video, const std::string& croped_video, int start_sec, int lasting_sec);
 void on_mouse(int EVENT, int x, int y, int flags, void* ustc);
 void Label_GW_TSR_pt(const std::string& video_path);
-void TEST_HOMO(const std::string& video_path);
+void Tracking_Test(const std::string& video_path);
 std::vector<cv::Point> arr2vec(cv::Point* arr, int num);
 cv::Rect scaling_Rect(cv::Rect rect, double factor);
 

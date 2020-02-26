@@ -31,10 +31,10 @@ int main(int argc, char** argv){
 
 
 	//Homography Test
-	// TEST_HOMO("./../TSR1.mp4");
-	// TEST_HOMO("./../TSR2.mp4");
-	// TEST_HOMO("./../TSR3.mp4");
-	TEST_HOMO("./../TSR4.mp4");
+	// Tracking_Test("./../TSR1.mp4");
+	Tracking_Test("./../TSR2.mp4");
+	// Tracking_Test("./../TSR3.mp4");
+	// Tracking_Test("./../TSR4.mp4");
 
 
 
