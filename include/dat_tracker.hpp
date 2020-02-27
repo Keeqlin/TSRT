@@ -3,6 +3,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <queue>
 #include <cmath>
 
 #include <opencv2/opencv.hpp>
@@ -16,17 +17,17 @@
 
 
 struct dat_cfg {
-	bool show_figures = false;
+	bool show_figures = true;
 	int  img_scale_target_diagonal = 75;
 	double search_win_padding = 2;
 	double surr_win_factor = 1.9;
-	int color_space = 1; //1rgb 2lab 3hsv 4gray
+	int color_space = 3; //1rgb 2lab 3hsv 4gray
 	int num_bins = 16;
 	cv::Mat bin_mapping; //getBinMapping(cfg.num_bins);
 	double prob_lut_update_rate = 0.05;
-	bool distractor_aware = true;
+	bool distractor_aware = false;
 	std::vector<double> adapt_thresh_prob_bins; // 0:0.05 : 1;
-	int motion_estimation_history_size = 5;
+	int motion_estimation_history_size = 3;
 
 	int nms_scale = 1;
 	double nms_overlap = 0.9;
@@ -57,7 +58,11 @@ protected:
 
 	double getAdaptiveThreshold(cv::Mat prob_map, cv::Rect obj_rect_surr);
 
-	cv::Mat getForegroundProb(cv::Mat frame, cv::Mat prob_lut, cv::Mat bin_mapping);
+	cv::Size Scale_estimation(cv::Mat& prob_map, cv::Rect& obj_rect_surr);
+
+	cv::Size region_growing(cv::Mat& tmp_map, cv::Rect& obj_rect_surr, std::queue<cv::Point>& seeds);
+
+	cv::Mat getForegroundProb(cv::Mat frame, cv::Mat prob_lut);
 
 	cv::Mat CalculateHann(cv::Size sz);
 
@@ -67,13 +72,21 @@ protected:
 
 	cv::Point getMotionPrediction(std::vector<cv::Point>values, int maxNumFrames);
 
-	cv::Rect pos2rect(cv::Point obj_center, cv::Size obj_size, cv::Size win_size);
+	cv::Rect pos2rect(const cv::Point& obj_center, const cv::Size& obj_size, const cv::Size& win_size);
 
-	cv::Rect pos2rect(cv::Point obj_center, cv::Size obj_size);
+	cv::Rect pos2rect(const cv::Point& obj_center, const cv::Size& obj_size);
 
 	cv::Mat getSubwindow(const cv::Mat &frame, cv::Point centerCoor, cv::Size sz);
 
 	dat_cfg default_parameters_dat(dat_cfg cfg);
+
+	void convert_color_space(cv::Mat img);
+
+	std::string type2str(int type);
+
+	inline void generate_prob_map(cv::Mat &prob_map,cv::Mat &Input_img, cv::Mat &prob_lut);
+
+	cv::Point get_Rect_center(cv::Rect& rect);
 
 private:
 	dat_cfg cfg;

@@ -2,40 +2,29 @@
 
 void DAT_TRACKER::tracker_dat_initialize(cv::Mat I, cv::Rect region){
 
-	double cx = region.x + double(region.width - 1) / 2.0;
-	double cy = region.y + double(region.height - 1) / 2.0;
+	// double cx = region.x + double(region.width - 1) / 2.0;
+	// double cy = region.y + double(region.height - 1) / 2.0;
 	double w = region.width;
 	double h = region.height;
 
-	cv::Point target_pos(round(cx),round(cy));
+	// cv::Point target_pos(round(cx),round(cy));
+	cv::Point target_pos = get_Rect_center(region);
 	cv::Size target_sz(round(w),round(h));
 
-	scale_factor_ = std::min(1.0, round(10.0 * double(cfg.img_scale_target_diagonal) / cv::norm(cv::Point(target_sz.width,target_sz.height))) / 10.0);
+	scale_factor_ = 1; // scale the whole image rather than 
+	// scale_factor_ = std::min(1.0, round(10.0 * double(cfg.img_scale_target_diagonal) / cv::norm(cv::Point(target_sz.width,target_sz.height))) / 10.0);
 	target_pos.x = target_pos.x * scale_factor_; target_pos.y = target_pos.y * scale_factor_;
 	target_sz.width = target_sz.width * scale_factor_; target_sz.height = target_sz.height * scale_factor_;
   
 	cv::Mat img;
-	cv::resize(I, img, cv::Size(), scale_factor_, scale_factor_);
-	switch (cfg.color_space) {
-	case 1: //1rgb
-		img.copyTo(img);
-		break;
-	case 2: //2lab
-		cv::cvtColor(img, img, CV_BGR2Lab);
-		break;
-	case 3: //3hsv
-		cv::cvtColor(img, img, CV_BGR2HSV);
-		break;
-	case 4: //4gray
-		cv::cvtColor(img, img, CV_BGR2GRAY);
-		break;
-	default:
-		std::cout << "int_variable does not equal any of the above cases" << std::endl;
-	}
+	cv::resize(I, img, cv::Size(), scale_factor_, scale_factor_); //1rgb: default color space
+	convert_color_space(img);
+
 	cv::Size surr_sz(floor(cfg.surr_win_factor * target_sz.width), 
 					 floor(cfg.surr_win_factor * target_sz.height));
 	cv::Rect surr_rect = pos2rect(target_pos, surr_sz, img.size());
 	cv::Rect obj_rect_surr = pos2rect(target_pos, target_sz, img.size());
+	// adjust obj_rect_surr form img corrdinate system to surr_rect corrdinate system 
 	obj_rect_surr.x -= surr_rect.x;
 	obj_rect_surr.y -= surr_rect.y;
 	cv::Mat surr_win = getSubwindow(img, target_pos, surr_sz);
@@ -44,7 +33,11 @@ void DAT_TRACKER::tracker_dat_initialize(cv::Mat I, cv::Rect region){
 
 	prob_lut_distractor_ = prob_lut_.clone();
 	prob_lut_masked_ = prob_lut_.clone();
-	adaptive_threshold_ = getAdaptiveThreshold(prob_map, obj_rect_surr);
+	
+	adaptive_threshold_ = getAdaptiveThreshold(prob_map, obj_rect_surr); 
+	//TODO update the target size based on adaptive_threshold
+	target_sz = Scale_estimation(prob_map,obj_rect_surr);
+
 
 	target_pos_history_.push_back(cv::Point(target_pos.x / scale_factor_, target_pos.y / scale_factor_));
 	target_sz_history_.push_back(cv::Size(target_sz.width / scale_factor_, target_sz.height / scale_factor_));
@@ -52,25 +45,13 @@ void DAT_TRACKER::tracker_dat_initialize(cv::Mat I, cv::Rect region){
 
 cv::Rect DAT_TRACKER::tracker_dat_update(cv::Mat I){
 
-	cv::Mat img_preprocessed;
-	cv::resize(I, img_preprocessed, cv::Size(), scale_factor_, scale_factor_);
+	// cv::Mat img_preprocessed;
+	// cv::resize(I, img_preprocessed, cv::Size(), scale_factor_, scale_factor_); //1rgb: default color space
 	cv::Mat img;
-	switch (cfg.color_space) {
-	case 1://1rgb
-		img_preprocessed.copyTo(img);
-		break;
-	case 2://2lab
-		cv::cvtColor(img_preprocessed, img, CV_BGR2Lab);
-		break;
-	case 3://3hsv
-		cv::cvtColor(img_preprocessed, img, CV_BGR2HSV);
-		break;
-	case 4://4gray
-		cv::cvtColor(img_preprocessed, img, CV_BGR2GRAY);
-		break;
-	default:
-		std::cout << "int_variable does not equal any of the above cases" << std::endl;
-	}
+	cv::resize(I, img, cv::Size(), scale_factor_, scale_factor_); //1rgb: default color space
+	convert_color_space(img);
+
+
 	cv::Point prev_pos = target_pos_history_.back();
 	cv::Size prev_sz = target_sz_history_.back();
 
@@ -88,12 +69,14 @@ cv::Rect DAT_TRACKER::tracker_dat_update(cv::Mat I){
 	getSubwindowMasked(img, target_pos, search_sz, search_win, padded_search_win);
 
 	// Apply probability LUT
-	cv::Mat pm_search = getForegroundProb(search_win, prob_lut_, cfg.bin_mapping);
+	cv::Mat pm_search = getForegroundProb(search_win, prob_lut_);
 	cv::Mat pm_search_dist;
+	
 	if (cfg.distractor_aware) {
-		pm_search_dist = getForegroundProb(search_win, prob_lut_distractor_, cfg.bin_mapping);
+		pm_search_dist = getForegroundProb(search_win, prob_lut_distractor_);
 		pm_search = (pm_search + pm_search_dist)/2.;
 	}
+	cv::Mat pm_search_unpadded = pm_search.clone();
 	pm_search.setTo(0, padded_search_win);
 
 	// Cosine / Hanning window
@@ -137,10 +120,12 @@ cv::Rect DAT_TRACKER::tracker_dat_update(cv::Mat I){
 	// Localization visualization
 	if (cfg.show_figures) {
 		cv::Mat pm_search_color;
-		pm_search.convertTo(pm_search_color,CV_8UC1,255);
+		// pm_search.convertTo(pm_search_color,CV_8UC1,255);
+		//display unpadded pm_search
+		pm_search_unpadded.convertTo(pm_search_color,CV_8UC1,255);
 		applyColorMap(pm_search_color, pm_search_color, cv::COLORMAP_JET);
 		for (size_t i = 0; i < hypotheses.size(); ++i){
-			cv::rectangle(pm_search_color, hypotheses[i], cv::Scalar(0, 255, 255 * (i != best_candidate)), 2);
+			cv::rectangle(pm_search_color, hypotheses[i], cv::Scalar(0, 255, 255 * (i != best_candidate)), 1);
 		}
 		cv::imshow("Search Window", pm_search_color);
 		cv::waitKey(1);
@@ -185,17 +170,20 @@ cv::Rect DAT_TRACKER::tracker_dat_update(cv::Mat I){
 				prob_lut_ = (1 - cfg.prob_lut_update_rate) * prob_lut_ + cfg.prob_lut_update_rate * prob_lut_bg;
 			}
 
-			prob_map = getForegroundProb(surr_win, prob_lut_, cfg.bin_mapping);
-			cv::Mat dist_map = getForegroundProb(surr_win, prob_lut_distractor_, cfg.bin_mapping);
+			prob_map = getForegroundProb(surr_win, prob_lut_);
+			cv::Mat dist_map = getForegroundProb(surr_win, prob_lut_distractor_);
 			prob_map = .5 * prob_map + .5 * dist_map;
 		}
 		else { // No distractor - awareness
 			prob_lut_ = (1 - cfg.prob_lut_update_rate) * prob_lut_ + cfg.prob_lut_update_rate * prob_lut_bg;
-			prob_map = getForegroundProb(surr_win, prob_lut_, cfg.bin_mapping);
+			prob_map = getForegroundProb(surr_win, prob_lut_);
 		}
 		// Update adaptive threshold
 		adaptive_threshold_ = getAdaptiveThreshold(prob_map, obj_rect_surr);
+		std::cout<<"adaptive_threshold_: "<<adaptive_threshold_<<std::endl;
 	}
+	//TODO handel the scale issue using adaptive_threshold
+
 	
 	// Store current location
 	target_pos.x = target_pos.x + search_rect.x ;
@@ -214,7 +202,8 @@ cv::Rect DAT_TRACKER::tracker_dat_update(cv::Mat I){
 	cv::Rect location = pos2rect(target_pos_history_.back(), target_sz_history_.back(), I.size());
 
 	// Adapt image scale factor
-	scale_factor_ = std::min(1.0, round(10.0 * double(cfg.img_scale_target_diagonal) / cv::norm(cv::Point(target_sz_original.width, target_sz_original.height))) / 10.0);
+	scale_factor_ = 1;
+	// scale_factor_ = std::min(1.0, round(10.0 * double(cfg.img_scale_target_diagonal) / cv::norm(cv::Point(target_sz_original.width, target_sz_original.height))) / 10.0);
 	return location;
 }
 
@@ -403,16 +392,9 @@ cv::Mat DAT_TRACKER::CalculateHann(cv::Size sz) {
 	return temp2.t()*temp1;
 }
 
-cv::Mat DAT_TRACKER::getForegroundProb(cv::Mat frame, cv::Mat prob_lut, cv::Mat bin_mapping){
-	cv::Mat frame_bin;
-	cv::Mat prob_map(frame.size(), CV_32FC1);
-	cv::LUT(frame, bin_mapping, frame_bin);
-	float *p_prob_map = prob_map.ptr<float>(0);
-	cv::MatIterator_<cv::Vec3b> it, end;
-	for (it = frame_bin.begin<cv::Vec3b>(), end = frame_bin.end<cv::Vec3b>(); it != end; ++it)
-	{
-		*p_prob_map++ = prob_lut.at<float>((*it)[0], (*it)[1], (*it)[2]);
-	}
+cv::Mat DAT_TRACKER::getForegroundProb(cv::Mat frame, cv::Mat prob_lut){
+	cv::Mat prob_map;
+	generate_prob_map(prob_map,frame,prob_lut);
 	return prob_map;
 }
 
@@ -472,6 +454,7 @@ void DAT_TRACKER::getForegroundBackgroundProbs(cv::Mat frame, cv::Rect obj_rect,
 	float gRange[] = { 0, 256 };
 	float rRange[] = { 0, 256 };
 	const float *ranges[] = { bRange, gRange, rRange };
+	//TODO check the range value of different color space
 	
 	cv::Mat surr_hist, obj_hist;
 	cv::calcHist(&frame, imgCount, channels, mask, surr_hist, dims, sizes, ranges);
@@ -490,19 +473,10 @@ void DAT_TRACKER::getForegroundBackgroundProbs(cv::Mat frame, cv::Rect obj_rect,
 	cv::Rect obj_region(std::max(0, obj_col), std::max(0, obj_row),
 		obj_col + obj_width + 1 - std::max(0, obj_col), obj_row + obj_height + 1 - std::max(0, obj_row));
 	obj_win = frame(obj_region);
-	cv::calcHist(&obj_win, imgCount, channels, mask, obj_hist, dims, sizes, ranges);
-	prob_lut = (obj_hist + 1.) / (surr_hist + 2.);
+	cv::calcHist(&obj_win, imgCount, channels, mask, obj_hist, dims, sizes, ranges); //hist: array of accumulated pixel number in corrsponding bin
+	prob_lut = (obj_hist + 1.) / (surr_hist + 2.); //ste 0.5 for unseen color
 
-	prob_map = cv::Mat(frame.size(), CV_32FC1);
-	cv::Mat frame_bin;
-	cv::LUT(frame, bin_mapping, frame_bin);
-
-	float *p_prob_map = prob_map.ptr<float>(0);
-	cv::MatIterator_<cv::Vec3b> it, end;
-	for (it = frame_bin.begin<cv::Vec3b>(), end = frame_bin.end<cv::Vec3b>(); it != end; ++it)
-	{
-		*p_prob_map++ = prob_lut.at<float>((*it)[0], (*it)[1], (*it)[2]);
-	}
+	generate_prob_map(prob_map,frame,prob_lut);
 }
 
 
@@ -516,6 +490,7 @@ void DAT_TRACKER::getForegroundBackgroundProbs(cv::Mat frame, cv::Rect obj_rect,
 	float gRange[] = { 0, 256 };
 	float rRange[] = { 0, 256 };
 	const float *ranges[] = { bRange, gRange, rRange };
+	
 
 	cv::Mat surr_hist, obj_hist;
 	cv::calcHist(&frame, imgCount, channels, mask, surr_hist, dims, sizes, ranges);
@@ -534,6 +509,7 @@ void DAT_TRACKER::getForegroundBackgroundProbs(cv::Mat frame, cv::Rect obj_rect,
 	frame(cv::Rect(std::max(0, obj_col), std::max(0, obj_row), obj_width + 1, obj_height + 1)).copyTo(obj_win);
 	cv::calcHist(&obj_win, imgCount, channels, mask, obj_hist, dims, sizes, ranges);
 	prob_lut = (obj_hist + 1) / (surr_hist + 2);
+
 }
 
 
@@ -541,6 +517,8 @@ double DAT_TRACKER::getAdaptiveThreshold(cv::Mat prob_map, cv::Rect obj_coords){
 	obj_coords.width++; obj_coords.width = std::min(prob_map.cols - obj_coords.x, obj_coords.width);
 	obj_coords.height++; obj_coords.height = std::min(prob_map.rows - obj_coords.y, obj_coords.height);
 	cv::Mat obj_prob_map = prob_map(obj_coords);
+	//TODO employ inner 80& of the obj_coords for sacling adoption 
+
 	int bins = 21;
 	float range[] = { -0.025, 1.025 };
 	const float* histRange = { range };
@@ -567,6 +545,8 @@ double DAT_TRACKER::getAdaptiveThreshold(cv::Mat prob_map, cv::Rect obj_coords){
 		k.at<float>(i, 0) = cum_H_obj.at<float>(i + 1, 0) - cum_H_obj.at<float>(i, 0);
 	cv::Mat cum_H_obj_lt = (cum_H_obj < (1 - cum_H_dist));
 	cum_H_obj_lt.convertTo(cum_H_obj_lt, CV_32FC1, 1.0/255);
+
+	// core function for selecting best adaptive threshold
 	cv::Mat x = abs(cum_H_obj - (1 - cum_H_dist)) + cum_H_obj_lt + (1 - k);
 	float xmin = 100;
 	int min_index = 0;
@@ -582,13 +562,96 @@ double DAT_TRACKER::getAdaptiveThreshold(cv::Mat prob_map, cv::Rect obj_coords){
 	return threshold;
 }
 
-cv::Rect DAT_TRACKER::pos2rect(cv::Point obj_center, cv::Size obj_size, cv::Size win_size){
+
+cv::Size DAT_TRACKER::Scale_estimation(cv::Mat& prob_map, cv::Rect& obj_rect_surr){
+	cv::imshow("prob_map",prob_map);
+	cv::waitKey(0);
+	std::cout<<type2str(prob_map.type())<<std::endl;
+	cv::Mat tmp_map = prob_map.clone();
+	std::queue<cv::Point> seeds;
+	float* ptr_data;
+	for(int y = 0; y<prob_map.rows; y++){
+		ptr_data = tmp_map.ptr<float>(y);
+		for(int x =0; x<prob_map.cols;x++){
+			auto prob = ptr_data[x]; 
+			std::cout<<"prob: "<<prob<<std::endl;
+			cv::Point seed(x,y);
+			if(prob < adaptive_threshold_){
+				ptr_data[x] = 0;
+			}else{
+				ptr_data[x] = 1;
+				if(obj_rect_surr.contains(seed))
+					seeds.push(std::move(seed));
+			}
+		}
+	}
+	
+	return region_growing(tmp_map, obj_rect_surr, seeds);
+}
+
+cv::Size DAT_TRACKER::region_growing(cv::Mat& tmp_map, cv::Rect& obj_rect_surr, std::queue<cv::Point>& seeds){
+	const cv::Point neighbors[8] = {
+    	cv::Point(1, 0), cv::Point(1, -1), cv::Point(0, -1), cv::Point(-1, -1),
+    	cv::Point(-1, 0), cv::Point(-1, 1), cv::Point(0, 1), cv::Point(1, 1)
+	};
+
+	auto out_of_map = [&tmp_map](cv::Point& pt){
+		if(pt.x >= 0 && pt.y >=0 && pt.x < tmp_map.cols && pt.y < tmp_map.rows)
+			return false;
+		return true;
+	};
+
+	int tl_x, tl_y, br_x, br_y;
+	cv::Point obj_center = get_Rect_center(obj_rect_surr);
+	tl_x = br_x = obj_center.x;
+	tl_y = br_y = obj_center.y;
+
+	auto update_tl_br = [&](cv::Point& pt){
+		if(pt.x > br_x)
+			br_x = pt.x;
+		if(pt.y > br_y)
+			br_y = pt.y;
+		if(pt.x <= tl_x)
+			tl_x = pt.x;
+		if(pt.y <= tl_y)
+			tl_y = pt.y;
+	};
+
+	std::cout<<"Scale_estimation"<<seeds.size()<<std::endl;
+	// region growing for determining update_tl_br
+	float marker = -1; //value of tmp_map{0,1}	
+	while(seeds.empty()){
+		auto pt = seeds.back();
+		update_tl_br(pt);
+		seeds.pop();
+		tmp_map.at<float>(pt) = marker;
+		for(int i=0; i<8; i++){
+			auto neighbor = pt + neighbors[i];
+			auto mark = tmp_map.at<float>(neighbor);
+			if( mark == marker || out_of_map(neighbor) )
+				continue;
+			if(mark == 1)
+				seeds.push(std::move(neighbor));
+		}
+	}
+
+	// scale the size of obj_rect_surr
+	cv::Size scaled_size;
+	scaled_size.width = ((obj_center.x - tl_x)>(br_x - obj_center.x))?(obj_center.x - tl_x):(br_x - obj_center.x);
+	scaled_size.height = ((obj_center.y - tl_y)>(br_y - obj_center.y))?(obj_center.y - tl_y):(br_y - obj_center.y);
+
+	return scaled_size;
+}
+
+
+
+cv::Rect DAT_TRACKER::pos2rect(const cv::Point& obj_center, const cv::Size& obj_size, const cv::Size& win_size){
 	cv::Rect rect(round(obj_center.x - obj_size.width / 2), round(obj_center.y - obj_size.height / 2), obj_size.width, obj_size.height);
 	cv::Rect border(0, 0, win_size.width - 1, win_size.height - 1);
 	return rect&border;
 }
 
-cv::Rect DAT_TRACKER::pos2rect(cv::Point obj_center, cv::Size obj_size){
+cv::Rect DAT_TRACKER::pos2rect(const cv::Point& obj_center, const cv::Size& obj_size){
 	cv::Rect rect(round(obj_center.x - obj_size.width / 2), round(obj_center.y - obj_size.height / 2), obj_size.width, obj_size.height);
 	return rect;
 }
@@ -607,8 +670,10 @@ dat_cfg DAT_TRACKER::default_parameters_dat(dat_cfg cfg){
 
 cv::Mat DAT_TRACKER::getSubwindow(const cv::Mat &frame, cv::Point centerCoor, cv::Size sz) {
 	cv::Mat subWindow;
-	cv::Point lefttop(std::min(frame.cols - 1, std::max(-sz.width + 1, centerCoor.x - cvFloor(float(sz.width) / 2.0) + 1)),
-		std::min(frame.rows - 1, std::max(-sz.height + 1, centerCoor.y - cvFloor(float(sz.height) / 2.0) + 1)));
+	cv::Point lefttop(
+		std::min(frame.cols - 1, std::max(-sz.width + 1, centerCoor.x - cvFloor(float(sz.width) / 2.0) + 1)),
+		std::min(frame.rows - 1, std::max(-sz.height + 1, centerCoor.y - cvFloor(float(sz.height) / 2.0) + 1))
+	);
 	cv::Point rightbottom(lefttop.x + sz.width - 1, lefttop.y + sz.height - 1);
 
 	cv::Rect border(-std::min(lefttop.x, 0), -std::min(lefttop.y, 0),
@@ -626,3 +691,75 @@ cv::Mat DAT_TRACKER::getSubwindow(const cv::Mat &frame, cv::Point centerCoor, cv
 		cv::copyMakeBorder(subWindow, subWindow, border.y, border.height, border.x, border.width, cv::BORDER_REPLICATE);
 	return subWindow;
 }
+
+
+
+void DAT_TRACKER::convert_color_space(cv::Mat img){
+	switch (cfg.color_space) {
+	case 1: //1rgb
+		break;
+	case 2: //2lab
+		cv::cvtColor(img, img, CV_BGR2Lab);
+		break;
+	case 3: //3hsv
+		cv::cvtColor(img, img, CV_BGR2HSV);
+		break;
+	case 4: //4gray
+		cv::cvtColor(img, img, CV_BGR2GRAY);
+		break;
+	default:
+		std::cout << "cfg.color_space(int) does not equal any of the above cases(using default RGB space)..." << std::endl;
+	}
+}
+
+
+std::string DAT_TRACKER::type2str(int type) {
+  std::string r;
+
+  uchar depth = type & CV_MAT_DEPTH_MASK;
+  uchar chans = 1 + (type >> CV_CN_SHIFT);
+
+  switch ( depth ) {
+    case CV_8U:  r = "8U"; break;
+    case CV_8S:  r = "8S"; break;
+    case CV_16U: r = "16U"; break;
+    case CV_16S: r = "16S"; break;
+    case CV_32S: r = "32S"; break;
+    case CV_32F: r = "32F"; break;
+    case CV_64F: r = "64F"; break;
+    default:     r = "User"; break;
+  }
+
+  r += "C";
+  r += (chans+'0');
+
+  return r;
+}
+
+
+void DAT_TRACKER::generate_prob_map(cv::Mat& prob_map,cv::Mat& Input_img, cv::Mat& prob_lut){
+	prob_map = cv::Mat(Input_img.size(), CV_32FC1);
+	cv::Mat frame_bin;
+	cv::LUT(Input_img, cfg.bin_mapping, frame_bin);  
+	float *p_prob_map = prob_map.ptr<float>(0);
+	cv::MatIterator_<cv::Vec3b> it, end;
+	for (it = frame_bin.begin<cv::Vec3b>(), end = frame_bin.end<cv::Vec3b>(); it != end; ++it)
+	{
+		*p_prob_map++ = prob_lut.at<float>((*it)[0], (*it)[1], (*it)[2]);
+	}
+	
+	cv::Mat pm_search_color;
+	prob_map.convertTo(pm_search_color,CV_8UC1,255);
+	applyColorMap(pm_search_color, pm_search_color, cv::COLORMAP_JET);
+	cv::imshow("prob_map",pm_search_color);
+	cv::waitKey(0);
+}
+
+
+cv::Point DAT_TRACKER::get_Rect_center(cv::Rect& rect){
+	double cx = rect.x + double(rect.width - 1) / 2.0;
+	double cy = rect.y + double(rect.height - 1) / 2.0;
+	cv::Point rect_center(round(cx),round(cy));
+}
+
+	

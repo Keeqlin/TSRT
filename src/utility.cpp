@@ -223,23 +223,22 @@ void Tracking_Test(const std::string& video_path){
         // cv::Mat mask(OriImg.size(),CV_8UC1,cv::Scalar::all(0));
         // std::vector<cv::KeyPoint> keypoints; 
         // gt_Rect = cv::boundingRect(std::vector<cv::Point>(labeled_pts,labeled_pts+pt_num));
-        // gt_Rect = scaling_Rect(gt_Rect,1.5);
-        // mask(gt_Rect).setTo(cv::Scalar::all(255)); //creat the mask of scaled gt_Rect
-        // detector->detect(OriImg, keypoints,mask); 
-        // std::cout<<"keypoint detection elapsed "<<calculate_time(start)<<" ms"<<std::endl;
-        // cv::rectangle(Img, ROI, RED);
+        // auto scaled_gt_Rect = scaling_Rect(gt_Rect,1.5);
+        // mask(scaled_gt_Rect).setTo(cv::Scalar::all(255)); //creat the mask of scaled gt_Rect
+        // // detector->detect(OriImg, keypoints,mask); 
+        // // std::cout<<"keypoint detection elapsed "<<calculate_time(start)<<" ms"<<std::endl;
+        // cv::rectangle(Img, scaled_gt_Rect, RED);
 
-        // for(auto& kp: keypoints)
-        //     cv::circle(Img,kp.pt,1,GREEN);
+        // // for(auto& kp: keypoints)
+        // //     cv::circle(Img,kp.pt,1,GREEN);
 
 
         // cv::imshow("Tracking_Test",Img);
         // cv::waitKey(0);
-        // cv::waitKey(FPS);
+        // // cv::waitKey(FPS);
     }
 
     std::cout<<"DAT test\n";
-
     int ini_idx = 20;
     cv::Rect Location = gt_vRect[ini_idx];
     DAT_TRACKER dat;
@@ -257,12 +256,13 @@ void Tracking_Test(const std::string& video_path){
         cv::waitKey(0);
     }
 
-
-
-
 }
 
 cv::Rect scaling_Rect(cv::Rect rect, double factor){
+
+    // auto size = cv::Size(rect.width*factor,rect.height*factor);
+    // auto tl = cv::Point(rect.x*factor,rect.y*factor);
+    // return cv::Rect(rect.x*factor,rect.y*factor,rect.width*factor,rect.height*factor);
     auto size = cv::Size(rect.width*factor,rect.height*factor);
     rect = rect + size; 
     cv::Point pt;  

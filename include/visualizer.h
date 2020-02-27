@@ -70,7 +70,7 @@ public:
     Eigen::Vector3f tcw;
 };
 
-
+class Obj;
 class Camera_Viewer{
 public:
     explicit Camera_Viewer(Eigen::Matrix3f& _K):K(_K){
@@ -80,12 +80,13 @@ public:
         projected_Img = cv::Mat::zeros(cv::Size(K(0,2)*2,K(1,2)*2),CV_8UC3);
     }
     void setPose(const Pose& _pose);
-    cv::Point2f projection(const Eigen::Vector3f& pt_world);
     void projectToImg(const std::vector<GBRxyzPt>& pointcloud);
     cv::Mat getImg() const;
     Eigen::Matrix3f K;   // Intrinsics matrix
  protected:
+    friend class Obj;
     bool out_of_Img(int col, int row) const;
+    cv::Point2f projection(const Eigen::Vector3f& pt_world);
  private:
      Pose pose;           // world coordinate system
      // Eigen::VectorXf distCoeffs;
