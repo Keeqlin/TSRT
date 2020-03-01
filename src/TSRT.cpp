@@ -275,7 +275,6 @@ std::vector<TSR> read_BTSD_GT(const std::string& ground_truth_path, unsigned int
 		getline(read_stream,line);
 		np++;
 	}
-
 	return vTSR;
 }
 

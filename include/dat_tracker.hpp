@@ -24,7 +24,7 @@ struct dat_cfg {
 	int color_space = 3; //1rgb 2lab 3hsv 4gray
 	int num_bins = 16;
 	cv::Mat bin_mapping; //getBinMapping(cfg.num_bins);
-	double prob_lut_update_rate = 0.05;
+	double prob_lut_update_rate = 0.2;
 	bool distractor_aware = false;
 	std::vector<double> adapt_thresh_prob_bins; // 0:0.05 : 1;
 	int motion_estimation_history_size = 3;
@@ -88,15 +88,17 @@ protected:
 
 	cv::Point get_Rect_center(cv::Rect& rect);
 
-private:
-	dat_cfg cfg;
-	double scale_factor_;
-	cv::Mat prob_lut_;
-	cv::Mat prob_lut_distractor_;
-	cv::Mat prob_lut_masked_;
-	double adaptive_threshold_;
-	std::vector<cv::Point>target_pos_history_;
-	std::vector<cv::Size>target_sz_history_;
+	cv::Mat prob_visualization(cv::Mat &prob_map);
+
+	private:
+		dat_cfg cfg;
+		double scale_factor_;
+		cv::Mat prob_lut_;
+		cv::Mat prob_lut_distractor_;
+		cv::Mat prob_lut_masked_;
+		double adaptive_threshold_;
+		std::vector<cv::Point> target_pos_history_;
+		std::vector<cv::Size> target_sz_history_;
 };
 
 #endif /* DAT_TRACKER_HPP_ */

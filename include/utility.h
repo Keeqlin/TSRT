@@ -50,8 +50,6 @@ const float RadperDeg = M_PI/180.0;
 const float cmTOm = 1.0/100;
 const float mTOcm = 100;
 
-
-
 class TSR{
 public:
     TSR(std::string& _type, cv::Rect& _bbox, unsigned int _frame, cv::Point3d& _pos):
@@ -71,26 +69,21 @@ public:
 inline std::ostream& operator<<(std::ostream& os, const TSR& rhs){
     os<<rhs.frame<<','<<rhs.type<<','<<rhs.bbox<<','<<rhs.pos;
     return os;
-}/*-------------------IMUDATA-------------------*/
+}
 
 class BTSD_GT{
 	std::string seqName;
 	int number_pole;
 };
 
-
-
-
 std::vector<std::string> getline_and_prasingstr(std::fstream& fs, const std::string& delim = " ;");
 void crop_video(const std::string& raw_video, const std::string& croped_video, int start_sec, int lasting_sec);
 void on_mouse(int EVENT, int x, int y, int flags, void* ustc);
 void Label_GW_TSR_pt(const std::string& video_path);
 void Tracking_Test(const std::string& video_path);
-std::vector<cv::Point> arr2vec(cv::Point* arr, int num);
 cv::Rect scaling_Rect(cv::Rect rect, double factor);
 
 
-void pose_recording(std::fstream& os, cv::Mat& R, cv::Mat& T);
 void pnp(std::vector<cv::Point3f>& Pt_3D, std::vector<cv::Point2f>& projected_pt, cv::Mat K);
 void Homography(std::vector<cv::Point2f>& ref_vertex,std::vector<cv::Point2f>& proj_vertex, cv::Mat K);
 double calculate_time(const std::chrono::steady_clock::time_point& _start);
