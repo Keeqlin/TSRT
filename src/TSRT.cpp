@@ -32,9 +32,9 @@ int main(int argc, char** argv){
 
 	//Homography Test
 	// Tracking_Test("./../TSR1.mp4");
-	Tracking_Test("./../TSR2.mp4");
+	// Tracking_Test("./../TSR2.mp4");
 	// Tracking_Test("./../TSR3.mp4");
-	// Tracking_Test("./../TSR4.mp4");
+	Tracking_Test("./../TSR4.mp4");
 
 
 
@@ -275,7 +275,6 @@ std::vector<TSR> read_BTSD_GT(const std::string& ground_truth_path, unsigned int
 		getline(read_stream,line);
 		np++;
 	}
-
 	return vTSR;
 }
 

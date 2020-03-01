@@ -122,12 +122,7 @@ void Label_GW_TSR_pt(const std::string& video_path){
     std::cout<<video_path<<" has "<<cap.get(CV_CAP_PROP_FRAME_COUNT)<<std::endl;
 	cv::Mat Img;
 	int frameIdx = 0;
-	// extern bool labeled_flag;
-	// extern int labeled_num_pt;
-	// extern cv::Point2d vpt[10];
 	while(cap.read(Img)){
-		// extern std::string winName;
-		// extern cv::Mat annoted_Img;
 		annoted_Img = Img.clone();
 		cv::imshow(winName, annoted_Img);
 		std::stringstream ss;
@@ -152,9 +147,7 @@ void Label_GW_TSR_pt(const std::string& video_path){
 		}
 		frameIdx++;
 	}
-
     fs.close();
-
 }
 
 void Tracking_Test(const std::string& video_path){
@@ -232,14 +225,13 @@ void Tracking_Test(const std::string& video_path){
         // // for(auto& kp: keypoints)
         // //     cv::circle(Img,kp.pt,1,GREEN);
 
-
         // cv::imshow("Tracking_Test",Img);
         // cv::waitKey(0);
         // // cv::waitKey(FPS);
     }
 
     std::cout<<"DAT test\n";
-    int ini_idx = 20;
+    int ini_idx = 185;
     cv::Rect Location = gt_vRect[ini_idx];
     DAT_TRACKER dat;
     for(int idx = ini_idx; idx<frames.size(); idx++){
@@ -248,64 +240,22 @@ void Tracking_Test(const std::string& video_path){
             dat.tracker_dat_initialize(Img, Location);
         else
             Location = dat.tracker_dat_update(Img);
-
         //visualization
         cv::rectangle(Img, gt_vRect[idx], RED, 2);
         cv::rectangle(Img, Location, BLUE, 2);
         cv::imshow("DAT", Img);
         cv::waitKey(0);
     }
-
 }
 
 cv::Rect scaling_Rect(cv::Rect rect, double factor){
-
-    // auto size = cv::Size(rect.width*factor,rect.height*factor);
-    // auto tl = cv::Point(rect.x*factor,rect.y*factor);
-    // return cv::Rect(rect.x*factor,rect.y*factor,rect.width*factor,rect.height*factor);
     auto size = cv::Size(rect.width*factor,rect.height*factor);
     rect = rect + size; 
     cv::Point pt;  
     pt.x = cvRound(size.width/2.0);  
     pt.y = cvRound(size.height/2.0); 
-    auto center = (rect.br()+rect.tl())/2;
     return (rect-pt);
 }
-
-
-std::vector<cv::Point> arr2vec(cv::Point* arr, int num){
-    std::vector<cv::Point> vecpt;
-    for(int i =0; i<num; i++){
-        vecpt.push_back(arr[i]);
-    }
-    return vecpt;
-}
-
-
-
-
-
-
-
-
-
-void pose_recording(std::fstream& os, cv::Mat& R, cv::Mat& T){
-    // double yaw,pitch,roll;
-    Eigen::Vector3f eigen_T(T.at<float>(0,0),T.at<float>(0,1),T.at<float>(0,2));
-    // getAnglesformR(R, pitch, yaw, roll);
-    cv::Matx33f R33((float*)R.ptr());
-    eigen_T = -cvToEigenMat(R33).inverse()*eigen_T;
-    Eigen::Vector3f eulerAng = cvToEigenMat(R33).inverse().eulerAngles(2, 1, 0);
-    eulerAng = eulerAng / (CV_PI/180);
-    float roll, yaw, pitch;
-    roll = eulerAng.z();
-    yaw = eulerAng.y();
-    pitch = eulerAng.x();
-    // getAnglesformR(R.inv(), pitch, yaw, roll);
-    os<<yaw<<","<<pitch<<","<<roll<<","
-      <<eigen_T.x()<<","<<eigen_T.y()<<","<<eigen_T.z()<<std::endl;
-}
-
 
 void pnp(std::vector<cv::Point3f>& Pt_3D, std::vector<cv::Point2f>& projected_pt, cv::Mat K){
     static std::fstream pnp_stream;
@@ -319,14 +269,12 @@ void pnp(std::vector<cv::Point3f>& Pt_3D, std::vector<cv::Point2f>& projected_pt
 	cv::Mat raux, taux;
 	cv::Mat_<float> rotMat(3, 3);
 	cv::solvePnP( Pt_3D, projected_pt, K, cv::noArray(), raux, taux);
-	raux.convertTo(Rvec, CV_32F);    //旋转向量
+	raux.convertTo(Rvec, CV_32F);   //旋转向量
 	taux.convertTo(Tvec, CV_32F);   //平移向量
-	cv::Rodrigues(Rvec, rotMat);  //由于solvePnP返回的是旋转向量，故用罗德里格斯变换变成旋转矩阵
+	cv::Rodrigues(Rvec, rotMat);    //由于solvePnP返回的是旋转向量，故用罗德里格斯变换变成旋转矩阵
 	
     auto Rcw = rotMat.inv();
     auto tcw = -Rcw*Tvec;
-    // std::cout<<"tcw: "<<tcw.t()<<"m"<<std::endl;
-    // std::cout<<"pyr_cw: "<<-Rvec.t()*DegperRad<<std::endl<<std::endl;
     pnp_stream<<tcw.t()<<','<<-Rvec.t()*DegperRad<<std::endl;
 }
 
@@ -348,7 +296,6 @@ void Homography(std::vector<cv::Point2f>& ref_vertex,std::vector<cv::Point2f>& p
 	cv::decomposeHomographyMat(H,K,r,t,n);
     std::cout<<"decomposeHomographyMat elapsed "<<calculate_time(start)<<" ms"<<std::endl;
 
-    		
 	// // auto ratio_K = K.clone();
 	// // ratio_K.at<double>(1,1) *= y_factor;
 	// cv::decomposeHomographyMat(H,ratio_K,r,t,n);
