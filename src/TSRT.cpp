@@ -81,7 +81,7 @@ int main(int argc, char** argv){
 	double TSR_height = -4; // m
 	double camera_height = -1; // m
 	
-
+	cv::VideoWriter recorder(std::string("./../stimulated_TS.mp4").c_str(), CV_FOURCC('M', 'P', '4', 'V'), 15, cv::Size(cx*2,cy*2));
 	Eigen::Matrix3f camera_pyr_config = Eigen::AngleAxisf(-5*RadperDeg,Eigen::Vector3f(1,0,0)).toRotationMatrix();
 	VISUALIZER::Camera_Viewer viewer(Intrinsics, VISUALIZER::Pose(camera_pyr_config, Eigen::Vector3f(-Road_width*1.5, camera_height, 0)));
 	std::vector<VISUALIZER::Obj*> vecObj_ptr; 
@@ -137,11 +137,11 @@ int main(int argc, char** argv){
 		if(path_pt_xyz.z() > TSR_depth-10)
 			break;
 		if(distance(path_pt_xyz,ref_xyz)>speed_perframe){
-			// auto& next_pt_xyz = vecObj_ptr.back()->get()[i+1].xyz;
-			// auto rad = std::atan2(next_pt_xyz.x()-path_pt_xyz.x(),next_pt_xyz.z()-path_pt_xyz.z());
-			// auto Rwc = Eigen::AngleAxisf(rad ,Eigen::Vector3f(0,1,0)).toRotationMatrix();
-			// camera_pose.push_back(VISUALIZER::Pose(Rwc*camera_pyr_config,path_pt_xyz+camera_height_offset));
-			camera_pose.push_back(VISUALIZER::Pose(camera_pyr_config,path_pt_xyz+camera_height_offset));
+			auto& next_pt_xyz = vecObj_ptr.back()->get()[i+1].xyz;
+			auto rad = std::atan2(next_pt_xyz.x()-path_pt_xyz.x(),next_pt_xyz.z()-path_pt_xyz.z());
+			auto Rwc = Eigen::AngleAxisf(rad ,Eigen::Vector3f(0,1,0)).toRotationMatrix();
+			camera_pose.push_back(VISUALIZER::Pose(Rwc*camera_pyr_config,path_pt_xyz+camera_height_offset));
+			// camera_pose.push_back(VISUALIZER::Pose(camera_pyr_config,path_pt_xyz+camera_height_offset));
 			ref_xyz = path_pt_xyz;
 		}
 		count++;
@@ -171,6 +171,7 @@ int main(int argc, char** argv){
 		#endif
 		Homography(ref_vertex,proj_vertex,EigenTocvMat(viewer.K));
 
+		recorder << cur_view;
 		cv::imshow("viewer",cur_view);
 		cv::waitKey(1);
 	}
