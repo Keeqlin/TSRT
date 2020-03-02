@@ -150,6 +150,66 @@ void Label_GW_TSR_pt(const std::string& video_path){
     fs.close();
 }
 
+
+void labeled_video(const std::string& video_path){
+
+    std::string video_name = video_path.substr(0,video_path.find(".mp4"));
+    std::string gt_path = video_name+"_GT.txt";
+    std::fstream fs(gt_path.c_str(), std::ios::in);
+    if(!fs)
+        WARNING_MSG_EXIT("Fail to open Ground Truth txt");
+
+    cv::VideoCapture cap(video_path); 
+    if(!cap.isOpened())
+        WARNING_MSG_EXIT("Error opening video..");
+
+    cv::Mat Img;
+    cv::Mat OriImg; 
+    int pt_num = 0;
+    int FPS = cap.get(CV_CAP_PROP_FPS);
+    cv::Size cap_size(cap.get(CV_CAP_PROP_FRAME_WIDTH),cap.get(CV_CAP_PROP_FRAME_HEIGHT));
+    cv::VideoWriter recorder(std::string(video_name+"_label.mp4").c_str(), CV_FOURCC('M', 'P', '4', 'V'), FPS, cap_size);
+
+    auto draw_line = [&](cv::Point* arr){
+        for(int i =0; i<pt_num; i++){
+            cv::circle(Img,arr[i],3,RED,-1);
+            if(i!=pt_num-1)
+                cv::line(Img,arr[i],arr[i+1],BLUE,1);
+            if(i==pt_num-1)
+                cv::line(Img,arr[pt_num-1],arr[0],BLUE,1);
+        }
+    };
+
+
+    while(cap.read(Img)){ //TEST LOOP
+        if(Img.empty())
+            break;
+        OriImg = Img.clone();
+        auto vstr = getline_and_prasingstr(fs, " ,[]");
+        
+        //extract ground truth from txt
+        pt_num = (vstr.size()-1)/2;
+        cv::Point labeled_pts[pt_num];
+        cv::Rect gt_Rect;
+        if(vstr.size()>1){
+            for(int i= 1; i<=pt_num; i++){
+                labeled_pts[i-1] = cv::Point(std::stoi(vstr[i*2-1]),std::stoi(vstr[i*2]));
+            }
+            draw_line(labeled_pts);
+            // cv::Point2f bbox_center = cv::Point2f(0,0);
+            // for(int i =0; i<pt_num; i++){
+            //     bbox_center.x += labeled_pts[i].x;
+            //     bbox_center.y += labeled_pts[i].y;
+            // }
+            // bbox_center /= 4;
+            // cv::circle(Img,bbox_center,2,RED,-1);
+        }
+        recorder << Img;
+        cv::imshow("Tracking_Test",Img);
+        cv::waitKey(1);
+    }
+}
+
 void Tracking_Test(const std::string& video_path){
 
     std::string gt_path = video_path.substr(0,video_path.find(".mp4"))+"_GT.txt";
@@ -230,22 +290,22 @@ void Tracking_Test(const std::string& video_path){
         // // cv::waitKey(FPS);
     }
 
-    std::cout<<"DAT test\n";
-    int ini_idx = 185;
-    cv::Rect Location = gt_vRect[ini_idx];
-    DAT_TRACKER dat;
-    for(int idx = ini_idx; idx<frames.size(); idx++){
-        cv::Mat Img = frames[idx];
-        if(idx == ini_idx)
-            dat.tracker_dat_initialize(Img, Location);
-        else
-            Location = dat.tracker_dat_update(Img);
-        //visualization
-        cv::rectangle(Img, gt_vRect[idx], RED, 2);
-        cv::rectangle(Img, Location, BLUE, 2);
-        cv::imshow("DAT", Img);
-        cv::waitKey(0);
-    }
+    // std::cout<<"DAT test\n";
+    // int ini_idx = 185;
+    // cv::Rect Location = gt_vRect[ini_idx];
+    // DAT_TRACKER dat;
+    // for(int idx = ini_idx; idx<frames.size(); idx++){
+    //     cv::Mat Img = frames[idx];
+    //     if(idx == ini_idx)
+    //         dat.tracker_dat_initialize(Img, Location);
+    //     else
+    //         Location = dat.tracker_dat_update(Img);
+    //     //visualization
+    //     cv::rectangle(Img, gt_vRect[idx], RED, 2);
+    //     cv::rectangle(Img, Location, BLUE, 2);
+    //     cv::imshow("DAT", Img);
+    //     cv::waitKey(0);
+    // }
 }
 
 cv::Rect scaling_Rect(cv::Rect rect, double factor){

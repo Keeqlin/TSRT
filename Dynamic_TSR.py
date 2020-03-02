@@ -15,7 +15,7 @@ def Diff(Data):
 def Position(Data,pt_num,figure_name, save_fig = False):
     fig, axs = plt.subplots(1,2, figsize=fig_size)
     frame_num = Data.shape[0]
-    for i in range(1,pt_num+1):
+    for i in range(1,pt_num):
         axs[0].plot(range(Data.shape[0]), Data[:,i*2-1],label=rect_pt[i-1])
         axs[1].plot(range(Data.shape[0]), Data[:,i*2],label=rect_pt[i-1])
     axs[0].set(xlabel='frame',ylabel='$pixel$',title='x_axis')
@@ -36,7 +36,7 @@ def Position(Data,pt_num,figure_name, save_fig = False):
 def Velocity(Data,pt_num,figure_name,save_fig = False):
     fig, axs = plt.subplots(1,2, figsize=fig_size)
     vData = Diff(Data)
-    for i in range(1,pt_num+1):
+    for i in range(1,pt_num):
         axs[0].plot(range(Data.shape[0]), vData[:,i*2-1],label=rect_pt[i-1])
         axs[1].plot(range(Data.shape[0]), vData[:,i*2],label=rect_pt[i-1])
 
@@ -55,7 +55,7 @@ def Velocity(Data,pt_num,figure_name,save_fig = False):
 def Acceleration(Data,pt_num,figure_name,save_fig = False):
     fig, axs = plt.subplots(1,2, figsize=fig_size)
     aData = Diff(Diff(Data))
-    for i in range(1,pt_num+1):
+    for i in range(1,pt_num):
         axs[0].plot(range(Data.shape[0]), aData[:,i*2-1],label=rect_pt[i-1])
         axs[1].plot(range(Data.shape[0]), aData[:,i*2],label=rect_pt[i-1])
     axs[0].set(xlabel='frame',ylabel='$pixel/frame^2$',title='x_axis')

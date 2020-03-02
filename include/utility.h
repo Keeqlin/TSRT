@@ -84,6 +84,7 @@ void Tracking_Test(const std::string& video_path);
 cv::Rect scaling_Rect(cv::Rect rect, double factor);
 
 
+void labeled_video(const std::string& video_path);
 void pnp(std::vector<cv::Point3f>& Pt_3D, std::vector<cv::Point2f>& projected_pt, cv::Mat K);
 void Homography(std::vector<cv::Point2f>& ref_vertex,std::vector<cv::Point2f>& proj_vertex, cv::Mat K);
 double calculate_time(const std::chrono::steady_clock::time_point& _start);

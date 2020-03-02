@@ -81,12 +81,12 @@ public:
     }
     void setPose(const Pose& _pose);
     void projectToImg(const std::vector<GBRxyzPt>& pointcloud);
+    cv::Point2f projection(const Eigen::Vector3f& pt_world);
     cv::Mat getImg() const;
     Eigen::Matrix3f K;   // Intrinsics matrix
  protected:
     friend class Obj;
     bool out_of_Img(int col, int row) const;
-    cv::Point2f projection(const Eigen::Vector3f& pt_world);
  private:
      Pose pose;           // world coordinate system
      // Eigen::VectorXf distCoeffs;

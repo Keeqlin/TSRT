@@ -12,8 +12,6 @@ Goal:
 
 
 
-
-
 Scenario:
 	Multiple object,
 		without occulsion between tragets(data association concern)
@@ -27,7 +25,7 @@ Charateristic:
 	incermental framework for considering motion and apperane model simultaneously
 
 Difficulity:
-	backgroun, illumination, occlusion
+	background, illumination, occlusion
 
 Advantages againts deep learning method:
 	expensive resources(costs, computation, hardware, dataset)

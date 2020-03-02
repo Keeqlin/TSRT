@@ -31,14 +31,7 @@ void DAT_TRACKER::tracker_dat_initialize(cv::Mat I, cv::Rect region){
 	
 	adaptive_threshold_ = getAdaptiveThreshold(prob_map, obj_rect_surr); 
 	//TODO update the target size based on adaptive_threshold
-<<<<<<< HEAD
 	// target_sz = Scale_estimation(prob_map, obj_rect_surr);
-=======
-	std::cout << "target_sz: " << target_sz<<std::endl;
-	target_sz = Scale_estimation(prob_map, obj_rect_surr);
-	std::cout << "target_sz: " << target_sz << std::endl;
-	// cv::Rect scaled_obj_rect_surr = pos2rect(target_pos, target_sz, img.size());
->>>>>>> 09918e8faade35d129cbd482ff75917e551c4e6e
 
 	target_pos_history_.push_back(cv::Point(target_pos.x / scale_factor_, target_pos.y / scale_factor_));
 	target_sz_history_.push_back(cv::Size(target_sz.width / scale_factor_, target_sz.height / scale_factor_));
@@ -179,11 +172,7 @@ cv::Rect DAT_TRACKER::tracker_dat_update(cv::Mat I){
 		// Update adaptive threshold
 		adaptive_threshold_ = getAdaptiveThreshold(prob_map, obj_rect_surr);
 		std::cout<<"adaptive_threshold_: "<<adaptive_threshold_<<std::endl;
-<<<<<<< HEAD
 		// target_sz = Scale_estimation(prob_map, obj_rect_surr);
-=======
-		target_sz = Scale_estimation(prob_map, obj_rect_surr);
->>>>>>> 09918e8faade35d129cbd482ff75917e551c4e6e
 	}
 	//TODO handel the scale issue of using adaptive_threshold
 

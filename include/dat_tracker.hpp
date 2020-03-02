@@ -24,11 +24,7 @@ struct dat_cfg {
 	int color_space = 3; //1rgb 2lab 3hsv 4gray
 	int num_bins = 16;
 	cv::Mat bin_mapping; //getBinMapping(cfg.num_bins);
-<<<<<<< HEAD
 	double prob_lut_update_rate = 0.3;
-=======
-	double prob_lut_update_rate = 0.2;
->>>>>>> 09918e8faade35d129cbd482ff75917e551c4e6e
 	bool distractor_aware = false;
 	std::vector<double> adapt_thresh_prob_bins; // 0:0.05 : 1;
 	int motion_estimation_history_size = 3;
