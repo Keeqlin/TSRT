@@ -31,16 +31,6 @@ with open(PNP_file_name,'r') as f:
 PNP_pose = np.array(PNP_pose)
 print('PNP_pose.shape',PNP_pose.shape)
 
-# Diffz_pnp = PNP_pose[-1,2] - PNP_pose[0,2]
-# Diffz_Homo = Homo_pose_All[0,-1,2] - Homo_pose_All[0,0,2]
-# scale_z = Diffz_pnp/Diffz_Homo
-# print('scale_z:',scale_z)
-# Diffx_pnp = PNP_pose[-1,0] - PNP_pose[0,0]
-# Diffx_Homo = Homo_pose_All[0,-1,0] - Homo_pose_All[0,0,0]
-# scale_x = Diffx_pnp/Diffx_Homo
-# print('scale_x:',scale_x)
-
-
 
 mark = ['^','.','x','+']
 axis_name = ['x','y','z']
@@ -53,7 +43,7 @@ for j in range(len(axs_t)):
     axs_t[j].plot(range(PNP_pose.shape[0]), PNP_pose[:,j], label ="PNP")
 
 handles, labels = axs_t[len(axs_t)-1].get_legend_handles_labels()
-fig_t.legend(handles, labels, loc='lower center', ncol=4)      
+fig_t.legend(handles, labels, loc='lower center', ncol=5)      
 fig_t.suptitle('decomposedH_pose_t', fontsize = 10)
 fig_t.tight_layout() 
 
@@ -68,7 +58,7 @@ for j in range(len(axs_R)):
     axs_R[j].plot(range(PNP_pose.shape[0]), PNP_pose[:,j+3], label ="PNP")
 
 handles, labels = axs_R[len(axs_R)-1].get_legend_handles_labels()
-fig_R.legend(handles, labels, loc='lower center', ncol=4)      
+fig_R.legend(handles, labels, loc='lower center', ncol=5)      
 fig_R.suptitle('decomposedH_pose_R', fontsize = 10)
 fig_R.tight_layout() 
 

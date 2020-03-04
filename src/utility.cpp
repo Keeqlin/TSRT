@@ -244,9 +244,10 @@ void Tracking_Test(const std::string& video_path){
     // key point detector
     // auto detector = cv::ORB::create(); 
     auto detector = cv::FastFeatureDetector::create();
-    while(cap.read(Img)){ //TEST LOOP
-        if(Img.empty())
-            break;
+    int frame_num = cap.get(CV_CAP_PROP_FRAME_COUNT);
+    for(int i=0 ; i<frame_num-5; i++){
+    // while(cap.read(Img)){ //TEST LOOP
+        cap.read(Img);
         OriImg = Img.clone();
         auto vstr = getline_and_prasingstr(fs, " ,[]");
         
@@ -269,43 +270,138 @@ void Tracking_Test(const std::string& video_path){
             frames.push_back(OriImg);
             gt_Rect = cv::boundingRect(std::vector<cv::Point>(labeled_pts,labeled_pts+pt_num));
             gt_vRect.push_back(gt_Rect);
-        }
+        }else break;
+        
 
         // //detect ORB kp
         // auto start = std::chrono::steady_clock::now();
         // cv::Mat mask(OriImg.size(),CV_8UC1,cv::Scalar::all(0));
         // std::vector<cv::KeyPoint> keypoints; 
-        // gt_Rect = cv::boundingRect(std::vector<cv::Point>(labeled_pts,labeled_pts+pt_num));
         // auto scaled_gt_Rect = scaling_Rect(gt_Rect,1.5);
         // mask(scaled_gt_Rect).setTo(cv::Scalar::all(255)); //creat the mask of scaled gt_Rect
-        // // detector->detect(OriImg, keypoints,mask); 
-        // // std::cout<<"keypoint detection elapsed "<<calculate_time(start)<<" ms"<<std::endl;
+        // detector->detect(OriImg, keypoints,mask); 
+        // std::cout<<"keypoint detection elapsed "<<calculate_time(start)<<" ms"<<std::endl;
         // cv::rectangle(Img, scaled_gt_Rect, RED);
 
-        // // for(auto& kp: keypoints)
-        // //     cv::circle(Img,kp.pt,1,GREEN);
+        // for(auto& kp: keypoints)
+        //     cv::circle(Img,kp.pt,1,GREEN);
 
         // cv::imshow("Tracking_Test",Img);
         // cv::waitKey(0);
-        // // cv::waitKey(FPS);
+        // // // // cv::waitKey(FPS);
     }
 
-    // std::cout<<"DAT test\n";
-    // int ini_idx = 185;
-    // cv::Rect Location = gt_vRect[ini_idx];
-    // DAT_TRACKER dat;
-    // for(int idx = ini_idx; idx<frames.size(); idx++){
-    //     cv::Mat Img = frames[idx];
-    //     if(idx == ini_idx)
-    //         dat.tracker_dat_initialize(Img, Location);
-    //     else
-    //         Location = dat.tracker_dat_update(Img);
-    //     //visualization
-    //     cv::rectangle(Img, gt_vRect[idx], RED, 2);
-    //     cv::rectangle(Img, Location, BLUE, 2);
-    //     cv::imshow("DAT", Img);
-    //     cv::waitKey(0);
-    // }
+
+    int ini_idx = 30;
+    cv::Rect ini_Location = gt_vRect[ini_idx];
+    DAT_TRACKER dat;
+    STAPLE_TRACKER staple;
+    cv::Rect DAT_Result;
+    cv::Rect STAPLE_Result;
+    for(int idx = ini_idx; idx<frames.size(); idx++){
+        cv::Mat Img = frames[idx];
+        if(idx == ini_idx){
+            dat.tracker_dat_initialize(Img, ini_Location);
+            staple.tracker_staple_initialize(Img, ini_Location);
+            staple.tracker_staple_train(Img, true);
+        }
+        else{
+            DAT_Result = dat.tracker_dat_update(Img);
+            STAPLE_Result = staple.tracker_staple_update(Img);
+            staple.tracker_staple_train(Img, false);
+        }
+        //visualization
+        cv::rectangle(Img, gt_vRect[idx], RED, 1);
+        cv::rectangle(Img, DAT_Result, BLUE, 1);
+        cv::rectangle(Img, STAPLE_Result, GREEN, 1);
+        cv::imshow("Tracking Test", Img);
+        cv::waitKey(0);
+    }
+    cv::destroyAllWindows();
+}
+
+
+
+void Corner_Test(const std::string& video_path){
+
+    std::string gt_path = video_path.substr(0,video_path.find(".mp4"))+"_GT.txt";
+    std::fstream fs(gt_path.c_str(), std::ios::in);
+    if(!fs)
+        WARNING_MSG_EXIT("Fail to open Ground Truth txt");
+
+    cv::VideoCapture cap(video_path); 
+    if(!cap.isOpened())
+        WARNING_MSG_EXIT("Error opening video..");
+
+    cv::Mat Img;
+    cv::Mat OriImg; 
+    int pt_num = 0;
+    int FPS = cap.get(CV_CAP_PROP_FPS);
+
+    auto draw_line = [&](cv::Point* arr){
+        for(int i =0; i<pt_num; i++){
+            cv::circle(Img,arr[i],3,RED,-1);
+            if(i!=pt_num-1)
+                cv::line(Img,arr[i],arr[i+1],BLUE,1);
+            if(i==pt_num-1)
+                cv::line(Img,arr[pt_num-1],arr[0],BLUE,1);
+        }
+    };
+
+    std::vector<cv::Mat> frames;
+    std::vector<cv::Rect> gt_vRect;
+    std::vector<cv::Rect> tracked_vRect;
+
+
+    // key point detector
+    // auto detector = cv::ORB::create(); 
+    auto detector = cv::FastFeatureDetector::create();
+    int frame_num = cap.get(CV_CAP_PROP_FRAME_COUNT);
+    for(int i=0 ; i<frame_num-5; i++){
+    // while(cap.read(Img)){ //TEST LOOP
+        cap.read(Img);
+        OriImg = Img.clone();
+        auto vstr = getline_and_prasingstr(fs, " ,[]");
+        
+        //extract ground truth from txt
+        pt_num = (vstr.size()-1)/2;
+        cv::Point labeled_pts[pt_num];
+        cv::Rect gt_Rect;
+        if(vstr.size()>1){
+            for(int i= 1; i<=pt_num; i++){
+                labeled_pts[i-1] = cv::Point(std::stoi(vstr[i*2-1]),std::stoi(vstr[i*2]));
+            }
+            draw_line(labeled_pts);
+            // cv::Point2f bbox_center = cv::Point2f(0,0);
+            // for(int i =0; i<pt_num; i++){
+            //     bbox_center.x += labeled_pts[i].x;
+            //     bbox_center.y += labeled_pts[i].y;
+            // }
+            // bbox_center /= 4;
+            // cv::circle(Img,bbox_center,2,RED,-1);
+            frames.push_back(OriImg);
+            gt_Rect = cv::boundingRect(std::vector<cv::Point>(labeled_pts,labeled_pts+pt_num));
+            gt_vRect.push_back(gt_Rect);
+        }else break;
+        
+
+        //detect ORB kp
+        auto start = std::chrono::steady_clock::now();
+        cv::Mat mask(OriImg.size(),CV_8UC1,cv::Scalar::all(0));
+        std::vector<cv::KeyPoint> keypoints; 
+        auto scaled_gt_Rect = scaling_Rect(gt_Rect,1.5);
+        mask(scaled_gt_Rect).setTo(cv::Scalar::all(255)); //creat the mask of scaled gt_Rect
+        detector->detect(OriImg, keypoints,mask); 
+        std::cout<<"keypoint detection elapsed "<<calculate_time(start)<<" ms"<<std::endl;
+        cv::rectangle(Img, scaled_gt_Rect, RED);
+
+        for(auto& kp: keypoints)
+            cv::circle(Img,kp.pt,1,GREEN);
+
+        cv::imshow("Tracking_Test",Img);
+        cv::waitKey(0);
+        // // // cv::waitKey(FPS);
+    }
 }
 
 cv::Rect scaling_Rect(cv::Rect rect, double factor){
@@ -355,10 +451,6 @@ void Homography(std::vector<cv::Point2f>& ref_vertex,std::vector<cv::Point2f>& p
 	cv::Mat H = cv::findHomography(ref_vertex,proj_vertex);
 	cv::decomposeHomographyMat(H,K,r,t,n);
     std::cout<<"decomposeHomographyMat elapsed "<<calculate_time(start)<<" ms"<<std::endl;
-
-	// // auto ratio_K = K.clone();
-	// // ratio_K.at<double>(1,1) *= y_factor;
-	// cv::decomposeHomographyMat(H,ratio_K,r,t,n);
 
     int count = 0;
     for(int i=0;i<n.size(); i++){

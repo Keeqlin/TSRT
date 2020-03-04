@@ -19,6 +19,8 @@
 #include "opencv2/opencv.hpp"
 #include "opencv2/tracking.hpp"
 #include "opencv2/features2d/features2d.hpp"
+#include "staple_tracker.hpp"
+
 
 
 #include <Eigen/Core>
@@ -81,6 +83,7 @@ void crop_video(const std::string& raw_video, const std::string& croped_video, i
 void on_mouse(int EVENT, int x, int y, int flags, void* ustc);
 void Label_GW_TSR_pt(const std::string& video_path);
 void Tracking_Test(const std::string& video_path);
+void Corner_Test(const std::string& video_path);
 cv::Rect scaling_Rect(cv::Rect rect, double factor);
 
 
