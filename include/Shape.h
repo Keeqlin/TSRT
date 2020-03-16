@@ -49,6 +49,4 @@ using RECT = npt_shape<4>;
 } // namespace SHAPE
 
 
-
-
 #endif // SHAPE_H

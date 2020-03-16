@@ -76,8 +76,8 @@ public:
     explicit Camera_Viewer(Eigen::Matrix3f& _K):K(_K){
         projected_Img = cv::Mat::zeros(cv::Size(K(0,2)*2,K(1,2)*2),CV_8UC3);
     }
-    explicit Camera_Viewer(Eigen::Matrix3f& _K, const Pose& _pose):K(_K), pose(_pose){
-        projected_Img = cv::Mat::zeros(cv::Size(K(0,2)*2,K(1,2)*2),CV_8UC3);
+    explicit Camera_Viewer(Eigen::Matrix3f& _K, const Pose& _pose):Camera_Viewer(_K){
+        pose = _pose;
     }
     void setPose(const Pose& _pose);
     void projectToImg(const std::vector<GBRxyzPt>& pointcloud);
