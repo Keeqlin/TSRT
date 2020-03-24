@@ -28,11 +28,11 @@
 #include "cvEigenConverter.h"
 
 #define CODE_POS "...@"<<__func__<<" in "<<__FILE__ <<":"<< __LINE__<<"\n"
-#define LOG_MSG(msg) {std::cerr<<"[Log]: "<<msg<<CODE_POS;}
-#define ERROR_MSG(msg) {std::cerr<<"[Error]: "<<msg<<CODE_POS;}
-#define WARNING_MSG(msg) {std::cerr<<"[WARNING]: "<<msg<<CODE_POS;}                                                    
-#define ERROR_MSG_EXIT(msg) {std::cerr<<"[Error]: "<<msg<<CODE_POS; exit(1);}
-#define WARNING_MSG_EXIT(msg) {std::cerr<<"[WARNING]: "<<msg<<CODE_POS; exit(1);}                                                    
+#define LOG_MSG(msg) {std::cerr<<"[TSRT_Log]: "<<msg<<CODE_POS;}
+#define ERROR_MSG(msg) {std::cerr<<"[TSRT_Error]: "<<msg<<CODE_POS;}
+#define WARNING_MSG(msg) {std::cerr<<"[TSRT_WARNING]: "<<msg<<CODE_POS;}                                                    
+#define ERROR_MSG_EXIT(msg) {std::cerr<<"[TSRT_Error]: "<<msg<<CODE_POS; exit(1);}
+#define WARNING_MSG_EXIT(msg) {std::cerr<<"[TSRT_WARNING]: "<<msg<<CODE_POS; exit(1);}                                                    
 #define FORBIDDEN_FUNC ERROR_MSG_EXIT("Using forbidden function")
 #define OFFLINE_ONLY ERROR_MSG_EXIT("For OFFLINE mode only")
 #define ONVEHICLE_ONLY ERROR_MSG_EXIT("For ONVEHICLE mode only")
